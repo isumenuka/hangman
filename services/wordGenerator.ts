@@ -12,12 +12,20 @@ export const generateWord = async (): Promise<WordData> => {
   try {
     const mistral = new Mistral({ apiKey: API_KEY });
 
+    // Add randomness to prompt effectively breaking cache
+    const randomSeed = Math.random().toString(36).substring(7);
+
     const prompt = `
-      Generate a single "Curse Word" for a Hangman game.
+      Generate a UNIQUE and RANDOM "Curse Word" for a Hangman game.
+      Random Seed: ${randomSeed} (Ensure variety based on this)
+      
       THEME: Sri Lankan Culture (Food, Locations, History, Myth, Items).
-      CONSTRAINTS:
+      
+      CRITICAL CONSTRAINTS:
+      - Word must be STRICTLY 6 letters or longer.
+      - DO NOT USE "KOTTU" (Too short/common).
+      - DO NOT USE "RICE" or "CURRY" (Too simple).
       - Word must be SINGLE WORD (or joined with underscores), NO SPACES.
-      - Word must be 6 or more letters long.
       - Generated "hints" array must contain EXACTLY 5 simple English sentences progressively getting easier.
       
       Format (JSON ONLY, no markdown):
@@ -39,7 +47,8 @@ export const generateWord = async (): Promise<WordData> => {
       ],
       responseFormat: {
         type: "json_object"
-      }
+      },
+      temperature: 0.9, // High creativity/randomness
     });
 
     const text = response.choices?.[0]?.message?.content;

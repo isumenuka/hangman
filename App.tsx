@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { GameScene } from './components/Scene';
-import { generateWord } from './services/gemini';
+import { generateWord } from './services/wordGenerator';
 import { GameStatus, WordData, Player } from './types';
 import { Play, RotateCcw, HelpCircle, Loader2, Trophy, Skull, Users, Copy, Link, User } from 'lucide-react';
 import clsx from 'clsx';
@@ -728,49 +728,54 @@ export default function App() {
 
             {/* Sabotage Shop */}
             {gameMode !== 'SINGLE' && (
-              <div className="mb-4 flex items-center justify-between gap-3 bg-slate-900/50 p-2 rounded border border-slate-700/50">
-                <div className="flex-1 flex items-center gap-2">
-                  <div className="text-xs text-slate-400 uppercase font-bold tracking-widest">
-                    CURSE POINTS
+              <div className="mb-4 space-y-2">
+                {/* Main Powers Row */}
+                <div className="flex items-center justify-between gap-3 bg-slate-900/50 p-2 rounded border border-slate-700/50">
+                  <div className="flex-1 flex items-center gap-2">
+                    <div className="text-xs text-slate-400 uppercase font-bold tracking-widest">
+                      CURSE POINTS
+                    </div>
+                    <div className="text-xl font-horror text-purple-400 animate-pulse tracking-widest shadow-purple-500/50 drop-shadow-md">
+                      {curseEnergy}
+                    </div>
                   </div>
-                  <div className="text-xl font-horror text-purple-400 animate-pulse tracking-widest shadow-purple-500/50 drop-shadow-md">
-                    {curseEnergy}
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <button
-                    disabled={curseEnergy < 15}
-                    onClick={() => onCastSpell('FOG')}
-                    className="bg-purple-900/30 hover:bg-purple-800 disabled:opacity-30 border border-purple-500/50 text-purple-300 text-xs uppercase font-bold px-4 py-3 rounded transition-colors flex flex-col items-center leading-tight min-w-[70px]"
-                  >
-                    <span>FOG</span>
-                    <span className="text-[10px] opacity-70">15pts</span>
-                  </button>
-                  <button
-                    disabled={curseEnergy < 20}
-                    onClick={() => onCastSpell('SCRAMBLE')}
-                    className="bg-orange-900/30 hover:bg-orange-800 disabled:opacity-30 border border-orange-500/50 text-orange-300 text-xs uppercase font-bold px-4 py-3 rounded transition-colors flex flex-col items-center leading-tight min-w-[70px]"
-                  >
-                    <span>MIX</span>
-                    <span className="text-[10px] opacity-70">20pts</span>
-                  </button>
-                  <button
-                    disabled={curseEnergy < 20 || wrongGuesses === 0}
-                    onClick={onSoulMend}
-                    className="bg-green-900/30 hover:bg-green-800 disabled:opacity-30 border border-green-500/50 text-green-300 text-xs uppercase font-bold px-4 py-3 rounded transition-colors flex flex-col items-center leading-tight min-w-[70px]"
-                  >
-                    <span>HEAL</span>
-                    <span className="text-[10px] opacity-70">20pts</span>
-                  </button>
-                  {status === GameStatus.WON && (
+                  <div className="flex gap-1">
                     <button
-                      onClick={() => onCastSpell('JUMPSCARE')}
-                      className="bg-red-950/80 hover:bg-red-900 border border-red-600 text-red-500 hover:text-red-300 text-[10px] uppercase font-bold px-2 py-1 rounded transition-colors animate-pulse"
+                      disabled={curseEnergy < 15}
+                      onClick={() => onCastSpell('FOG')}
+                      className="bg-purple-900/30 hover:bg-purple-800 disabled:opacity-30 border border-purple-500/50 text-purple-300 text-xs uppercase font-bold px-4 py-3 rounded transition-colors flex flex-col items-center leading-tight min-w-[70px]"
                     >
-                      Scare
+                      <span>FOG</span>
+                      <span className="text-[10px] opacity-70">15pts</span>
                     </button>
-                  )}
+                    <button
+                      disabled={curseEnergy < 20}
+                      onClick={() => onCastSpell('SCRAMBLE')}
+                      className="bg-orange-900/30 hover:bg-orange-800 disabled:opacity-30 border border-orange-500/50 text-orange-300 text-xs uppercase font-bold px-4 py-3 rounded transition-colors flex flex-col items-center leading-tight min-w-[70px]"
+                    >
+                      <span>MIX</span>
+                      <span className="text-[10px] opacity-70">20pts</span>
+                    </button>
+                    <button
+                      disabled={curseEnergy < 20 || wrongGuesses === 0}
+                      onClick={onSoulMend}
+                      className="bg-green-900/30 hover:bg-green-800 disabled:opacity-30 border border-green-500/50 text-green-300 text-xs uppercase font-bold px-4 py-3 rounded transition-colors flex flex-col items-center leading-tight min-w-[70px]"
+                    >
+                      <span>HEAL</span>
+                      <span className="text-[10px] opacity-70">20pts</span>
+                    </button>
+                  </div>
                 </div>
+
+                {/* Scare Button - Separate Row Below */}
+                {status === GameStatus.WON && (
+                  <button
+                    onClick={() => onCastSpell('JUMPSCARE')}
+                    className="w-full bg-red-950/80 hover:bg-red-900 border-2 border-red-600 text-red-300 hover:text-red-100 text-sm uppercase font-bold px-4 py-3 rounded transition-colors animate-pulse flex items-center justify-center gap-2"
+                  >
+                    💀 JUMPSCARE
+                  </button>
+                )}
               </div>
             )}
 
