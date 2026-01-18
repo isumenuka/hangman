@@ -18,8 +18,10 @@ export default function App() {
   const [guessedLetters, setGuessedLetters] = useState<string[]>([]);
   const [status, setStatus] = useState<GameStatus>(GameStatus.IDLE);
   const [loading, setLoading] = useState(false);
-  const [showHint, setShowHint] = useState(false);
+  const [lobbyError, setLobbyError] = useState<string | null>(null);
   const [username, setUsername] = useState('');
+
+
 
   // --- Multiplayer State ---
   const [gameMode, setGameMode] = useState<'MENU' | 'SINGLE' | 'LOBBY_SETUP' | 'LOBBY_HOST' | 'LOBBY_JOIN'>('MENU');
@@ -217,37 +219,53 @@ export default function App() {
     try {
       const data = await generateWord();
 
-      // Add progressive hints (mock data for now)
+      // Use AI hints if available, otherwise fallback to generated ones (safety)
+      const finalHints = data.hints && data.hints.length === 5 ? data.hints : [
+        data.hint,
+        `Related to: ${data.difficulty} difficulty`,
+        `Category clue: Think carefully...`,
+        `Contains ${data.word.length} letters`,
+        `First letter is: ${data.word[0]}`
+      ];
+
       const enhancedData: WordData = {
         ...data,
-        hints: [
-          data.hint, // Hint 1 (Free)
-          `Related to: ${data.difficulty} difficulty`, // Hint 2 (20%)
-          `Category clue: Think carefully...`, // Hint 3 (40%)
-          `Contains ${data.word.replace(/[A-Z]/g, '*').length} letters`, // Hint 4 (60%)
-          `First letter is: ${data.word[0]}` // Hint 5 (80%)
-        ]
+        hints: finalHints
       };
 
       if (gameMode === 'SINGLE') {
+        // ... unused logic kept for type safety ...
         setWordData(enhancedData);
-        setGuessedLetters([]);
-        setStatus(GameStatus.PLAYING);
-        soundManager.playAmbient();
       } else if (amIHost) {
-        // Host Broadcasts to everyone
-        startGame(data);
-        // Host sets their own local state via the callback/broadcast loop logic or manually:
-        // In our hook, 'startGame' triggers broadcast. 
-        // We also need to set local state. 
-        setWordData(data);
+        startGame(enhancedData);
+        setWordData(enhancedData);
         setGuessedLetters([]);
         setStatus(GameStatus.PLAYING);
         soundManager.playAmbient();
       }
 
-    } catch (e) {
+    } catch (e: any) {
       console.error("Failed to start game", e);
+      soundManager.playWrong();
+
+      let errorMsg = "Ritual Failed: Could not summon a word.";
+      let detailedMsg = "";
+
+      if (e.message === "API_LIMIT_EXCEEDED" || e.message?.includes("429")) {
+        errorMsg = "🚫 API QUOTA EXCEEDED";
+        detailedMsg = "You've reached the free tier limit for the Gemini API. Please wait ~30 seconds and try again, or check your API quota at ai.google.dev";
+      }
+
+      setGameLog(prev => [{
+        id: Date.now(),
+        content: (
+          <div className="text-red-600 font-bold">
+            <div className="text-lg mb-1">{errorMsg}</div>
+            {detailedMsg && <div className="text-sm text-red-400 font-normal">{detailedMsg}</div>}
+          </div>
+        )
+      }, ...prev]);
+
     } finally {
       setLoading(false);
     }
@@ -478,6 +496,13 @@ export default function App() {
                 {loading ? <Loader2 className="animate-spin" /> : <Play size={24} />}
                 BEGIN RITUAL
               </button>
+
+              {/* Error Display */}
+              {gameLog.length > 0 && gameLog[0].content && (
+                <div className="mt-4 p-4 bg-red-950/50 border-2 border-red-600 rounded-lg animate-pulse">
+                  {gameLog[0].content}
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-center w-full max-w-md">

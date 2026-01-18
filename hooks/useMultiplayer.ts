@@ -49,7 +49,25 @@ export const useMultiplayer = (
     // Generate a simple 5-digit code for Host, or let PeerJS generate UUID for Client
     const customId = asHost ? Math.floor(10000 + Math.random() * 90000).toString() : undefined;
 
-    const peer = new Peer(customId);
+    // Config options
+    const peerConfig: any = {};
+
+    // Check for custom server config from Env
+    const envHost = import.meta.env.VITE_PEER_HOST;
+    const envPort = import.meta.env.VITE_PEER_PORT;
+    const envPath = import.meta.env.VITE_PEER_PATH;
+    const envSecure = import.meta.env.VITE_PEER_SECURE;
+
+    if (envHost) {
+      console.log("Using Custom Peer Server:", envHost);
+      peerConfig.host = envHost;
+      peerConfig.port = envPort ? parseInt(envPort) : 443;
+      peerConfig.path = envPath || '/hangman';
+      peerConfig.secure = envSecure === 'true';
+    }
+    // Else defaults to 0.peerjs.com public cloud
+
+    const peer = new Peer(customId, peerConfig);
     peerRef.current = peer;
     setMyName(name);
     setAmIHost(asHost);
