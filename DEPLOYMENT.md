@@ -57,10 +57,8 @@ This hosts the game itself.
     
     | Name | Value |
     |------|-------|
-    | `VITE_PEER_HOST` | `your-render-url.onrender.com` (remove https://) |
-    | `VITE_PEER_PORT` | `443` |
-    | `VITE_PEER_PATH` | `/hangman` |
-    | `VITE_PEER_SECURE` | `true` |
+    | `VITE_PEER_HOST` | `hangman-server.onrender.com` (Your Render URL, NO https://) |
+    | `VITE_SOCKET_URL` | `https://hangman-server.onrender.com` (Your Render URL, WITH https://) |
     | `VITE_MISTRAL_API_KEY`| `YOUR_MISTRAL_API_KEY` (Get from [console.mistral.ai](https://console.mistral.ai)) |
 
     *Example Host: `hangman-server.onrender.com`*
@@ -74,6 +72,6 @@ This hosts the game itself.
 1.  Open your **Vercel domain** (e.g., `hyper-hangman.vercel.app`).
 2.  Open the browser console (F12).
 3.  Start a game. Look for the log:
-    `Using Custom Peer Server: hangman-server.onrender.com`
+    `Socket connected: ...`
 
 **You are now fully fully deployed with your own private infrastructure!** 💀
