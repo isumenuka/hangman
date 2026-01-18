@@ -100,7 +100,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose }) => {
                                     <span className="font-bold text-red-500">SCARE</span>
                                     <span className="text-xs font-bold bg-red-900 px-2 py-0.5 rounded text-red-200">WIN</span>
                                 </div>
-                                <p className="text-xs text-slate-400">Jumpscare all losers.</p>
+                                <p className="text-xs text-slate-400">Jumpscare a victim.</p>
                             </div>
 
                         </div>

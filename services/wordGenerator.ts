@@ -20,12 +20,14 @@ export const generateWord = async (banList: string[] = []): Promise<WordData> =>
       Random Seed: ${randomSeed}
       EXCLUDE THESE WORDS (ALREADY PLAYED): ${banList.join(', ')}
       
-      THEME: Sri Lankan Culture (Food, Locations, History, Myth, Items).
+      THEME: Spooky/Cursed English Words (Adjectives, Nouns, Verbs).
       
       CRITICAL CONSTRAINTS:
       - Word must be STRICTLY 6 letters or longer.
-      - DO NOT USE "KOTTU" (Too short/common).
-      - DO NOT USE "RICE" or "CURRY" (Too simple).
+      - MUST BE Valid Standard English Dictionary Words.
+      - ABSOLUTELY NO Transliterated words (No Singlish).
+      - ABSOLUTELY NO Slang or Local Dialects.
+      - NO Proper Nouns (Names of people or specific places).
       - Word must be SINGLE WORD (or joined with underscores), NO SPACES.
       - Generated "hints" array must contain EXACTLY 5 simple English sentences progressively getting easier.
       

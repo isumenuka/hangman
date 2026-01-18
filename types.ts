@@ -27,6 +27,7 @@ export interface Player {
   isHost: boolean;
   status: 'LOBBY' | 'PLAYING' | 'WON' | 'LOST' | 'SPECTATING';
   mistakes: number; // 0-6
+  roundScore: number; // CP earned this round for tournament scoring
 }
 
 export type NetworkAction =

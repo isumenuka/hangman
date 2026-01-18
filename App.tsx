@@ -46,20 +46,26 @@ export default function App() {
   // Progressive Hints
   const [unlockedHints, setUnlockedHints] = useState(1);
   const [showHintUnlock, setShowHintUnlock] = useState(false);
+  const [hasScared, setHasScared] = useState(false); // Spam prevention
+
+  // Round State
+  const [round, setRound] = useState(1);
+  const [showGameOver, setShowGameOver] = useState(false);
 
   // Callbacks for Network
   const handleGameStart = useCallback((data: WordData) => {
     setWordData(data);
     setGuessedLetters([]);
     setStatus(GameStatus.PLAYING);
-    setCurseEnergy(0);
+    // setCurseEnergy(0); // KEPT POINTS PERSISTENT (User Request)
     setActiveDebuffs([]);
     setUnlockedHints(1); // Reset hints on new game
+    setHasScared(false); // Reset scare usage
     soundManager.playAmbient();
     soundManager.playClick();
 
     // Initial Log
-    setGameLog([{ id: Date.now(), content: "THE RITUAL HAS BEGUN" }]);
+    setGameLog(prev => [{ id: Date.now(), content: "THE RITUAL HAS BEGUN" }, ...prev]);
   }, []);
 
   const handleWorldUpdate = useCallback((players: Player[]) => {
@@ -115,6 +121,17 @@ export default function App() {
 
 
   const { initializePeer, joinLobby, startGame, updateMyStatus, castSpell, myId, roomId, players, connectionStatus, amIHost } = useMultiplayer(handleGameStart, handleWorldUpdate, handleSpellReceived, handleSpellLog);
+
+  // Check if Round 5 is complete (all players won/lost)
+  useEffect(() => {
+    if (round === 5 && gameMode !== 'SINGLE') {
+      const allFinished = players.every(p => p.status === 'WON' || p.status === 'LOST');
+      if (allFinished && players.length > 0 && !showGameOver) {
+        // Small delay for dramatic effect
+        setTimeout(() => setShowGameOver(true), 2000);
+      }
+    }
+  }, [round, players, gameMode, showGameOver]);
 
   // Derived State
   const wrongGuesses = guessedLetters.filter(l =>
@@ -214,6 +231,10 @@ export default function App() {
     if (loading) return;
     soundManager.playClick();
     setLoading(true);
+    // Increment Round if we are already playing/played
+    if (status !== GameStatus.IDLE) {
+      setRound(r => r + 1);
+    }
     setStatus(GameStatus.IDLE);
     setUnlockedHints(1); // Reset hints on new game
 
@@ -330,7 +351,29 @@ export default function App() {
 
   const onCastSpell = (spell: 'FOG' | 'SCRAMBLE' | 'JUMPSCARE') => {
     const cost = spell === 'FOG' ? 15 : spell === 'SCRAMBLE' ? 20 : 0;
-    if (spell !== 'JUMPSCARE' && curseEnergy < cost) return;
+
+    // Check constraints
+    if (spell !== 'JUMPSCARE' && curseEnergy < cost) {
+      soundManager.playWrong();
+      setGameLog(prev => [{
+        id: Date.now(),
+        content: <span className="text-red-500 font-bold shake">NOT ENOUGH ENERGY! ({cost} CP)</span>
+      }, ...prev]);
+      return;
+    }
+
+    // Jumpscare Restriction: Only if YOU WON? Or cost?
+    // User request implies manual selection. Letting it be free/selectable for now or check 'isWon'?
+    // Screenshot said "WIN". Usually means "Only usable when you won".
+    if (spell === 'JUMPSCARE' && status !== GameStatus.WON) {
+      soundManager.playWrong();
+      setGameLog(prev => [{
+        id: Date.now(),
+        content: <span className="text-red-500 font-bold">MUST WIN TO JUMPSCARE!</span>
+      }, ...prev]);
+      return;
+    }
+
     setSpellToCast(spell); // Enter selection mode
   };
 
@@ -347,6 +390,8 @@ export default function App() {
     // setCurseEnergy(0); // No longer reset to 0
     setSpellToCast(null); // Exit selection mode
     soundManager.playWin(); // temporary sound for casting
+    soundManager.playWin(); // temporary sound for casting
+    if (spellToCast === 'JUMPSCARE') setHasScared(true);
     // Close mobile list if open
     setShowMobileList(false);
   };
@@ -559,6 +604,115 @@ export default function App() {
     );
   }
 
+  // --- Game Over / Winner Screen (After Round 5) ---
+  if (showGameOver && gameMode !== 'SINGLE') {
+    // Calculate leaderboard based on roundScore
+    const sortedPlayers = [...players].sort((a, b) => b.roundScore - a.roundScore);
+    const top3 = sortedPlayers.slice(0, 3);
+
+    const handleNewGame = () => {
+      // Reset everything and go back to lobby
+      setShowGameOver(false);
+      setRound(1);
+      setCurseEnergy(0);
+      setStatus(GameStatus.IDLE);
+      setWordData(null);
+      setGuessedLetters([]);
+      // Reset player scores would need to be broadcast by host
+      soundManager.playClick();
+    };
+
+    return (
+      <div className="relative w-full h-screen bg-gradient-to-br from-slate-950 via-red-950/20 to-slate-950 overflow-hidden flex items-center justify-center">
+        <div className="absolute inset-0 z-0 opacity-30">
+          <GameScene wrongGuesses={0} isWon={true} isLost={false} />
+        </div>
+
+        <div className="relative z-10 max-w-2xl w-full mx-4 bg-black/90 backdrop-blur-xl border-2 border-red-600 rounded-lg shadow-2xl shadow-red-600/50 p-8">
+          {/* Header */}
+          <div className="text-center mb-8">
+            <h1 className="text-6xl font-horror text-red-600 tracking-wider mb-2 drop-shadow-[0_0_20px_rgba(220,38,38,0.8)]">
+              TOURNAMENT OVER
+            </h1>
+            <p className="text-slate-400 text-lg">5 Rounds Complete</p>
+          </div>
+
+          {/* Leaderboard */}
+          <div className="space-y-4 mb-8">
+            {top3.map((player, index) => {
+              const medals = ['🥇', '🥈', '🥉'];
+              const colors = ['text-yellow-400', 'text-slate-300', 'text-orange-400'];
+              const bgColors = ['bg-yellow-950/30', 'bg-slate-900/30', 'bg-orange-950/30'];
+              const borderColors = ['border-yellow-600/50', 'border-slate-500/50', 'border-orange-600/50'];
+
+              return (
+                <div
+                  key={player.id}
+                  className={clsx(
+                    "flex items-center justify-between p-4 rounded-lg border-2 transition-all",
+                    bgColors[index],
+                    borderColors[index],
+                    index === 0 && "ring-2 ring-yellow-500/50 scale-105"
+                  )}
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="text-4xl">{medals[index]}</span>
+                    <div>
+                      <div className={clsx("text-2xl font-horror", colors[index])}>
+                        {player.name}
+                      </div>
+                      <div className="text-xs text-slate-500 uppercase tracking-wider">
+                        {index === 0 ? 'CHAMPION' : index === 1 ? 'RUNNER-UP' : '3RD PLACE'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className={clsx("text-3xl font-bold font-horror", colors[index])}>
+                      {player.roundScore || 0}
+                    </div>
+                    <div className="text-xs text-slate-500">CP</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Other Players */}
+          {sortedPlayers.length > 3 && (
+            <div className="mb-6 border-t border-slate-800 pt-4">
+              <h3 className="text-slate-500 text-sm uppercase tracking-wider mb-2">Other Players</h3>
+              <div className="space-y-1">
+                {sortedPlayers.slice(3).map((player, index) => (
+                  <div key={player.id} className="flex justify-between text-sm text-slate-400 py-1">
+                    <span>{index + 4}. {player.name}</span>
+                    <span>{player.roundScore || 0} CP</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* New Game Button (Host Only) */}
+          {amIHost && (
+            <button
+              onClick={handleNewGame}
+              className="w-full py-4 bg-gradient-to-r from-red-900 to-red-700 hover:from-red-800 hover:to-red-600 text-white font-bold text-xl rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg shadow-red-900/50 hover:scale-105"
+            >
+              <Play size={24} /> NEW TOURNAMENT
+            </button>
+          )}
+
+          {/* Non-host message */}
+          {!amIHost && (
+            <div className="text-center text-slate-500 text-sm uppercase tracking-widest animate-pulse">
+              Waiting for host to start new tournament...
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // --- Main Game (Solo or Multiplayer) ---
   return (
     <div className="flex flex-col lg:flex-row w-full h-screen bg-slate-950 overflow-hidden text-slate-100">
@@ -614,11 +768,17 @@ export default function App() {
               <h1 className="text-3xl font-horror text-red-600 tracking-wider">
                 CURSED<span className="text-slate-100">MAN</span>
               </h1>
-              {gameMode !== 'SINGLE' && (
-                <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
-                  <User size={12} /> <span className="uppercase tracking-wider font-bold">{username}</span>
+              <div className="flex items-center gap-2">
+                {gameMode !== 'SINGLE' && (
+                  <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
+                    <User size={12} /> <span className="uppercase tracking-wider font-bold">{username}</span>
+                  </div>
+                )}
+                {/* Round Badge */}
+                <div className="bg-red-950/30 border border-red-900/50 px-2 py-0.5 rounded text-[10px] text-red-400 font-bold uppercase tracking-widest mt-1">
+                  ROUND {round}
                 </div>
-              )}
+              </div>
             </div>
             {/* Desktop: Toggle Player List if needed, or just show it inline? Let's show inline at bottom */}
             {gameMode !== 'SINGLE' && (
@@ -788,10 +948,16 @@ export default function App() {
                 {/* Scare Button - Separate Row Below */}
                 {status === GameStatus.WON && (
                   <button
+                    disabled={hasScared}
                     onClick={() => onCastSpell('JUMPSCARE')}
-                    className="w-full bg-red-950/80 hover:bg-red-900 border-2 border-red-600 text-red-300 hover:text-red-100 text-sm uppercase font-bold px-4 py-3 rounded transition-colors animate-pulse flex items-center justify-center gap-2"
+                    className={clsx(
+                      "w-full border-2 text-sm uppercase font-bold px-4 py-3 rounded transition-colors flex items-center justify-center gap-2",
+                      hasScared
+                        ? "bg-slate-900 border-slate-700 text-slate-500 cursor-not-allowed opacity-50"
+                        : "bg-red-950/80 hover:bg-red-900 border-red-600 text-red-300 hover:text-red-100 animate-pulse"
+                    )}
                   >
-                    💀 JUMPSCARE
+                    {hasScared ? "ALREADY SCARED" : "💀 JUMPSCARE"}
                   </button>
                 )}
               </div>
@@ -829,7 +995,7 @@ export default function App() {
               onClick={handleStartGame}
               className="mt-6 w-full py-3 bg-red-900 hover:bg-red-800 text-white font-bold rounded flex items-center justify-center gap-2 transition-colors border-t border-red-700"
             >
-              <RotateCcw size={18} /> RESTART RITUAL
+              <RotateCcw size={18} /> {status === GameStatus.WON || status === GameStatus.LOST ? `START ROUND ${round + 1}` : 'RESTART RITUAL'}
             </button>
           )}
           {gameMode !== 'SINGLE' && !amIHost && status !== GameStatus.IDLE && status !== GameStatus.PLAYING && (

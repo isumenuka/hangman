@@ -116,7 +116,8 @@ export const useMultiplayer = (
       name: name,
       isHost: true,
       status: 'LOBBY',
-      mistakes: 0
+      mistakes: 0,
+      roundScore: 0
     };
     setPlayers([me]);
     onWorldUpdate([me]);
