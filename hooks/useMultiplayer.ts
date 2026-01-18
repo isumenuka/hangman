@@ -46,8 +46,10 @@ export const useMultiplayer = (
   const initializePeer = useCallback((name: string, asHost: boolean) => {
     if (peerRef.current) return;
 
-    // Generate a simple 5-digit code for Host, or let PeerJS generate UUID for Client
-    const customId = asHost ? Math.floor(10000 + Math.random() * 90000).toString() : undefined;
+    // Generate a simple 6-digit code for Host
+    // We strive for numbers, but on public server collisions are possible.
+    const generateId = () => Math.floor(100000 + Math.random() * 900000).toString();
+    const customId = asHost ? generateId() : undefined;
 
     // Config options
     const peerConfig: any = {};
@@ -65,21 +67,25 @@ export const useMultiplayer = (
       peerConfig.path = envPath || '/hangman';
       peerConfig.secure = envSecure === 'true';
     }
-    // Else defaults to 0.peerjs.com public cloud
 
-    const peer = new Peer(customId, peerConfig);
+    // Initial creation
+    createPeer(customId, peerConfig, name, asHost);
+
+  }, []);
+
+  const createPeer = (id: string | undefined, config: any, name: string, asHost: boolean) => {
+    const peer = new Peer(id, config);
     peerRef.current = peer;
     setMyName(name);
     setAmIHost(asHost);
 
-    peer.on('open', (id) => {
-      console.log('Opened Peer:', id);
-      setMyId(id);
+    peer.on('open', (openId) => {
+      console.log('Opened Peer:', openId);
+      setMyId(openId);
 
-      // If Host, add self to player list immediately
       if (asHost) {
         setPlayers([{
-          id,
+          id: openId,
           name,
           isHost: true,
           status: 'LOBBY',
@@ -92,12 +98,23 @@ export const useMultiplayer = (
       handleIncomingConnection(conn, asHost);
     });
 
-    peer.on('error', (err) => {
+    peer.on('error', (err: any) => {
       console.error("Peer Error", err);
+
+      // Auto-retry on ID collision
+      if (err.type === 'unavailable-id' && asHost) {
+        console.log("ID Taken, retrying with new ID...");
+        peer.destroy();
+        peerRef.current = null;
+        const newId = Math.floor(100000 + Math.random() * 900000).toString();
+        // Short delay to prevent loop tight spinning
+        setTimeout(() => createPeer(newId, config, name, asHost), 500);
+        return;
+      }
+
       setConnectionStatus('DISCONNECTED');
     });
-
-  }, []);
+  };
 
   // --- 2. Host Logic: Handling Incoming Joins ---
   const handleIncomingConnection = (conn: DataConnection, isHost: boolean) => {
