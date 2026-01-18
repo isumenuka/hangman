@@ -336,27 +336,7 @@ export const useMultiplayer = (
 
 
   return {
-    initializePeer: connectSocket, // Keep naming for compatibility if needed, but signature changed? 
-    // Wait, signature of `initializePeer` in old was `(name, asHost)`.
-    // My `connectSocket` doesn't take args. 
-    // The consumer calls `initializePeer` then `createPeer`.
-    // Actually old usage: `initializePeer(name, asHost)` -> `createPeer`. 
-    // We should adapt to the existing interface or update the consumer.
-    // The consumer is likely `App.tsx` or `Lobby.tsx`.
-    // Let's check `App.tsx` usage? 
-    // To be safe, I will change the returned signature and Update `App.tsx` later, 
-    // OR adapter here.
 
-    // Adapter:
-    // Old: `initializePeer` called on mount or button?
-    // Let's look at `useMultiplayer.ts` original: 
-    // `initializePeer` took `name, asHost`.
-    // It did everything.
-
-    // New:
-    // `initializePeer` can be `(name, asHost) => ...`
-    // If asHost -> createGame(name)
-    // If !asHost -> just set name? Wait, Join is separate.
 
     initializePeer: (name: string, asHost: boolean) => {
       if (asHost) {
@@ -372,6 +352,7 @@ export const useMultiplayer = (
     updateMyStatus,
     castSpell,
     myId,
+    roomId: currentRoomId,
     players,
     connectionStatus,
     amIHost

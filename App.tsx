@@ -114,7 +114,7 @@ export default function App() {
   // (In JSX, replacing the Toast block)
 
 
-  const { initializePeer, joinLobby, startGame, updateMyStatus, castSpell, myId, players, connectionStatus, amIHost } = useMultiplayer(handleGameStart, handleWorldUpdate, handleSpellReceived, handleSpellLog);
+  const { initializePeer, joinLobby, startGame, updateMyStatus, castSpell, myId, roomId, players, connectionStatus, amIHost } = useMultiplayer(handleGameStart, handleWorldUpdate, handleSpellReceived, handleSpellLog);
 
   // Derived State
   const wrongGuesses = guessedLetters.filter(l =>
@@ -368,8 +368,8 @@ export default function App() {
   }, [handleGuess, gameMode, status]);
 
   const copyToClipboard = () => {
-    if (myId) {
-      navigator.clipboard.writeText(myId);
+    if (roomId) {
+      navigator.clipboard.writeText(roomId);
       alert("Ritual Code copied!");
     }
   };
@@ -488,9 +488,9 @@ export default function App() {
           {gameMode === 'LOBBY_HOST' ? (
             <div className="text-center w-full max-w-md">
               <p className="text-slate-400 mb-2">Ritual Code:</p>
-              {myId ? (
+              {roomId ? (
                 <div className="flex items-center gap-2 bg-slate-900 p-4 rounded border border-slate-600 mb-6">
-                  <code className="text-2xl text-yellow-500 tracking-wider flex-1 overflow-hidden text-ellipsis">{myId}</code>
+                  <code className="text-2xl text-yellow-500 tracking-wider flex-1 overflow-hidden text-ellipsis">{roomId}</code>
                   <button onClick={copyToClipboard} className="p-2 hover:bg-slate-800 text-slate-400 hover:text-white"><Copy size={20} /></button>
                 </div>
               ) : <Loader2 className="animate-spin mx-auto mb-6" />}
@@ -513,7 +513,7 @@ export default function App() {
             </div>
           ) : (
             <div className="text-center w-full max-w-md">
-              {connectionStatus === 'CONNECTED' ? (
+              {connectionStatus === 'CONNECTED' && players.length > 0 ? (
                 <div className="animate-pulse text-green-500 font-bold text-xl mb-4">CONNECTED TO HOST</div>
               ) : (
                 <>
@@ -544,7 +544,9 @@ export default function App() {
                   </p>
                 </>
               )}
-              <p className="text-slate-500">Waiting for host to start...</p>
+              <p className="text-slate-500">
+                {players.length > 0 ? "Waiting for host to start..." : "Enter code to join..."}
+              </p>
             </div>
           )}
         </div>
