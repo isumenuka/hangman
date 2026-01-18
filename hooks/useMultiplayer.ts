@@ -51,28 +51,47 @@ export const useMultiplayer = (
   // Connects to the Socket Server
   const connectSocket = useCallback(() => {
     // Allow env var override
-    const envHost = import.meta.env.VITE_PEER_HOST; // Still check this env var for migration
-    // But more likely we want waiting for a "VITE_SOCKET_URL" or defaulting to localhost:9000
+    const envSocketUrl = import.meta.env.VITE_SOCKET_URL;
+    const envPeerHost = import.meta.env.VITE_PEER_HOST; // Legacy support
 
     const defaultUrl = window.location.hostname === 'localhost'
       ? 'http://localhost:9000'
-      : 'https://hangman-server.onrender.com'; // User's deployed backend URL
+      : 'https://hangman-server.onrender.com';
 
-    const socketUrl = envHost ? `https://${envHost}` : defaultUrl;
+    let socketUrl = defaultUrl;
+    if (envSocketUrl) {
+      socketUrl = envSocketUrl;
+    } else if (envPeerHost) {
+      socketUrl = `https://${envPeerHost}`;
+    }
 
+    console.log("Connecting to Socket:", socketUrl);
     socketService.connect(socketUrl);
 
-    setConnectionStatus('CONNECTING'); // Optimistic
-    setTimeout(() => {
-      if (socketService.socket?.connected) {
+    setConnectionStatus('CONNECTING');
+
+    // Attach Listeners for State Management (Reliable)
+    if (socketService.socket) {
+      socketService.socket.on('connect', () => {
+        console.log("Socket Connected Event");
         setConnectionStatus('CONNECTED');
-      }
-    }, 500);
+      });
+      socketService.socket.on('disconnect', () => {
+        console.log("Socket Disconnected");
+        setConnectionStatus('DISCONNECTED');
+      });
+      socketService.socket.on('connect_error', (err) => {
+        console.error("Socket Error:", err);
+        setConnectionStatus('DISCONNECTED');
+      });
+    }
+
   }, []);
 
   useEffect(() => {
     connectSocket();
     return () => {
+      // Clean up listeners? socketService.disconnect() kills the socket so listeners die with it usually.
       socketService.disconnect();
     }
   }, []); // Run once on mount
