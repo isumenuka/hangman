@@ -61,6 +61,7 @@ This hosts the game itself.
     | `VITE_PEER_PORT` | `443` |
     | `VITE_PEER_PATH` | `/hangman` |
     | `VITE_PEER_SECURE` | `true` |
+    | `VITE_MISTRAL_API_KEY`| `YOUR_MISTRAL_API_KEY` (Get from [console.mistral.ai](https://console.mistral.ai)) |
 
     *Example Host: `hangman-server.onrender.com`*
 
