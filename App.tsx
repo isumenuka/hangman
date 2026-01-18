@@ -15,6 +15,7 @@ const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 export default function App() {
   // --- Local Game State ---
   const [wordData, setWordData] = useState<WordData | null>(null);
+  const [usedWords, setUsedWords] = useState<string[]>([]);
   const [guessedLetters, setGuessedLetters] = useState<string[]>([]);
   const [status, setStatus] = useState<GameStatus>(GameStatus.IDLE);
   const [loading, setLoading] = useState(false);
@@ -217,7 +218,13 @@ export default function App() {
     setUnlockedHints(1); // Reset hints on new game
 
     try {
-      const data = await generateWord();
+      const data = await generateWord(usedWords);
+
+      // Track used words to prevent repetition in this session
+      setUsedWords(prev => {
+        const newHistory = [...prev, data.word];
+        return newHistory.slice(-10); // Keep last 10
+      });
 
       // Use AI hints if available, otherwise fallback to generated ones (safety)
       const finalHints = data.hints && data.hints.length === 5 ? data.hints : [

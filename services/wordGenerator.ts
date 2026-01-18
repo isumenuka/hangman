@@ -3,7 +3,7 @@ import { Mistral } from "@mistralai/mistralai";
 
 const API_KEY = import.meta.env.VITE_MISTRAL_API_KEY;
 
-export const generateWord = async (): Promise<WordData> => {
+export const generateWord = async (banList: string[] = []): Promise<WordData> => {
   if (!API_KEY) {
     console.warn("Mistral Service: No API Key found.");
     throw new Error("API_KEY_MISSING");
@@ -17,7 +17,8 @@ export const generateWord = async (): Promise<WordData> => {
 
     const prompt = `
       Generate a UNIQUE and RANDOM "Curse Word" for a Hangman game.
-      Random Seed: ${randomSeed} (Ensure variety based on this)
+      Random Seed: ${randomSeed}
+      EXCLUDE THESE WORDS (ALREADY PLAYED): ${banList.join(', ')}
       
       THEME: Sri Lankan Culture (Food, Locations, History, Myth, Items).
       
