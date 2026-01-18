@@ -1,5 +1,5 @@
 import React, { useRef, useMemo, useEffect } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Stars, Sparkles, Cloud } from '@react-three/drei';
 import * as THREE from 'three';
 
@@ -297,9 +297,54 @@ interface SceneProps {
   isLost: boolean;
 }
 
+const ResponsiveCamera = () => {
+  const { camera, size } = useThree();
+
+  useEffect(() => {
+    const aspect = size.width / size.height;
+
+    // Bounds:
+    // Gallows Height: ~7 units (-5 to +2)
+    // Gallows Width: ~5 units
+
+    // Vertical FOV is fixed at 45.
+    // Visible Height = 2 * Dist * tan(22.5) ~ 0.828 * Dist
+
+    let targetZ = 9;
+    let targetY = 2;
+
+    if (aspect < 0.6) {
+      // Deep Portrait (Mobile Fullscreen Menu)
+      // Need width to fit 5 units.
+      // Visible Width = Visible Height * aspect = 0.828 * Dist * 0.6
+      // 5 = 0.49 * Dist => Dist ~ 10.
+      // But we want margins. Let's go safe.
+      targetZ = 18;
+      targetY = 0; // Center vertically
+    } else if (aspect < 1.4) {
+      // Square-ish / Tablet / Mobile Game View (40vh)
+      // Height fits tighter here.
+      // If Dist=9, Height=7.45. Content=7. Too tight.
+      targetZ = 13;
+      targetY = 1;
+    } else {
+      // Desktop
+      targetZ = 9;
+      targetY = 2;
+    }
+
+    camera.position.set(0, targetY, targetZ);
+    camera.updateProjectionMatrix();
+  }, [size, camera]);
+
+  return null;
+};
+
 export const GameScene: React.FC<SceneProps> = ({ wrongGuesses, isWon, isLost }) => {
   return (
     <Canvas shadows camera={{ position: [0, 2, 9], fov: 45 }}>
+      <ResponsiveCamera />
+
       {/* Background - Lighter Moonlight Blue */}
       <color attach="background" args={['#1a1d29']} />
       {/* Fog - much lighter and further back */}
@@ -353,7 +398,7 @@ export const GameScene: React.FC<SceneProps> = ({ wrongGuesses, isWon, isLost })
         minPolarAngle={Math.PI / 3}
         maxPolarAngle={Math.PI / 1.8}
         minDistance={6}
-        maxDistance={14}
+        maxDistance={20} // Increased max distance for mobile
       />
     </Canvas>
   );

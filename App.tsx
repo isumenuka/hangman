@@ -7,6 +7,7 @@ import clsx from 'clsx';
 import { soundManager } from './utils/SoundManager';
 import { useMultiplayer } from './hooks/useMultiplayer';
 import { PlayerList } from './components/PlayerList';
+import { RulesModal } from './components/RulesModal';
 
 const MAX_MISTAKES = 6;
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
@@ -24,6 +25,7 @@ export default function App() {
   const [gameMode, setGameMode] = useState<'MENU' | 'SINGLE' | 'LOBBY_SETUP' | 'LOBBY_HOST' | 'LOBBY_JOIN'>('MENU');
   const [joinInputId, setJoinInputId] = useState('');
   const [showMobileList, setShowMobileList] = useState(false);
+  const [showRules, setShowRules] = useState(false);
 
   // --- Sabotage State ---
   const [curseEnergy, setCurseEnergy] = useState(0);
@@ -387,18 +389,21 @@ export default function App() {
 
           <div className="flex flex-col gap-4">
             <button
-              onClick={() => { setGameMode('SINGLE'); handleStartGame(); }}
-              className="py-4 bg-slate-800 hover:bg-slate-700 text-white rounded font-bold border-l-4 border-slate-500 transition-all"
-            >
-              SINGLE PLAYER
-            </button>
-            <button
               onClick={() => setGameMode('LOBBY_SETUP')}
               className="py-4 bg-red-950/80 hover:bg-red-900 text-red-100 rounded font-bold border-l-4 border-red-600 transition-all flex items-center justify-center gap-2"
             >
-              <Users size={20} /> MULTIPLAYER (VS)
+              <Users size={20} /> ENTER RITUAL (MULTIPLAYER)
+            </button>
+
+            <button
+              onClick={() => setShowRules(true)}
+              className="py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-bold border-l-4 border-slate-600 transition-all flex items-center justify-center gap-2"
+            >
+              <HelpCircle size={20} /> RITUAL GUIDE
             </button>
           </div>
+
+          <RulesModal isOpen={showRules} onClose={() => setShowRules(false)} />
         </div>
       </div>
     );
@@ -448,9 +453,9 @@ export default function App() {
   // Active Lobby / Waiting Room
   if ((gameMode === 'LOBBY_HOST' || gameMode === 'LOBBY_JOIN') && status === GameStatus.IDLE) {
     return (
-      <div className="w-full h-screen bg-slate-950 flex gap-4 p-4">
+      <div className="w-full h-screen bg-slate-950 flex flex-col md:flex-row gap-4 p-4 overflow-y-auto">
         {/* Left: Setup Panel */}
-        <div className="flex-1 flex flex-col items-center justify-center bg-black/50 border border-slate-800 rounded relative">
+        <div className="flex-1 flex flex-col items-center justify-center bg-black/50 border border-slate-800 rounded relative min-h-[300px]">
           <button onClick={() => setGameMode('MENU')} className="absolute top-4 left-4 text-slate-500 hover:text-white">Exit</button>
 
           <h2 className="text-3xl font-horror mb-6 text-red-500">LOBBY</h2>
@@ -504,7 +509,7 @@ export default function App() {
         </div>
 
         {/* Right: Roster */}
-        <div className="w-80 hidden md:block">
+        <div className="w-full md:w-80">
           <PlayerList players={players} myId={myId} />
         </div>
       </div>
@@ -578,7 +583,16 @@ export default function App() {
                 <Users size={12} /> {players.length}
               </div>
             )}
+            <button
+              onClick={() => setShowRules(true)}
+              className="ml-2 p-2 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors"
+              title="Rules & Powers"
+            >
+              <HelpCircle size={18} />
+            </button>
           </div>
+
+          <RulesModal isOpen={showRules} onClose={() => setShowRules(false)} />
 
           {/* Word Display Area */}
           <div className="mb-8 flex flex-col items-center justify-center min-h-[120px] bg-black/20 rounded-lg p-4 border border-slate-800/50">
