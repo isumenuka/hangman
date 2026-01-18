@@ -51,8 +51,18 @@ export const useMultiplayer = (
     const generateId = () => Math.floor(100000 + Math.random() * 900000).toString();
     const customId = asHost ? generateId() : undefined;
 
-    // Config options
-    const peerConfig: any = {};
+    // Config options with ROBUST STUN servers for Mobile/Cross-Network connectivity
+    const peerConfig: any = {
+      debug: 1,
+      config: {
+        iceServers: [
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' },
+        ]
+      }
+    };
 
     // Check for custom server config from Env
     const envHost = import.meta.env.VITE_PEER_HOST;
