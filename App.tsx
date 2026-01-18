@@ -520,12 +520,21 @@ export default function App() {
                     />
                     <button
                       onClick={() => joinLobby(joinInputId, username)}
-                      disabled={connectionStatus === 'CONNECTING'}
-                      className="bg-blue-600 px-6 rounded font-bold"
+                      disabled={connectionStatus === 'CONNECTING' || !joinInputId}
+                      className="bg-blue-600 px-6 rounded font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      JOIN
+                      {connectionStatus === 'CONNECTING' ? <Loader2 className="animate-spin" /> : 'JOIN'}
                     </button>
                   </div>
+                  {connectionStatus === 'DISCONNECTED' && joinInputId && (
+                    <p className="text-red-500 text-xs mt-2">
+                      {/* Only show if we tried and failed - simpler heuristic might be needed or just show status */}
+                    </p>
+                  )}
+                  {/* Connection Help */}
+                  <p className="text-xs text-slate-600 mt-2">
+                    Stuck connecting? Ensure Host and you are on the same version/server.
+                  </p>
                 </>
               )}
               <p className="text-slate-500">Waiting for host to start...</p>
