@@ -33,7 +33,9 @@ export type NetworkAction =
   // Lobby Actions
   | { type: 'JOIN_REQUEST'; payload: { name: string } }
   | { type: 'JOIN_ACCEPT'; payload: { players: Player[] } } // Sent to new joiner
+  | { type: 'JOIN_ACCEPT'; payload: { players: Player[] } } // Sent to new joiner
   | { type: 'PLAYER_UPDATE'; payload: { players: Player[] } } // Sync lobby list
+  | { type: 'PLAYER_LEFT'; payload: { playerId: string } }
 
   // Game Control (Host -> All)
   | { type: 'GAME_START'; payload: { wordData: WordData } }

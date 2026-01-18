@@ -149,80 +149,38 @@ export const useMultiplayer = (
   const handleIncomingAction = useCallback((action: NetworkAction) => {
     // 1. Host Logic: New Joiner
     if (action.type === 'JOIN_REQUEST' && amIHost) {
-      // A new player wants to join.
-      // Note: In Socket.IO, we don't have the "conn" object to reply privately easily 
-      // unless we tracked socket ID source. 
-      // "action" payload usually doesn't have sender ID unless we added it.
-      // BUT, we need to add the new player to our state and then BROADCAST the full list.
+      const senderId = (action.payload as any).senderId;
+      const newPlayerName = action.payload.name;
 
-      // Wait. The "action" doesn't inherently include the sender ID unless logic adds it.
-      // PeerJS "conn.peer" gave us that.
-      // Socket.IO: We really need the sender's socket ID in the payload or wrapping.
-      // Let's assume the Server *could* wrap it, but for now let's hope we don't strictly need it 
-      // OR we blindly add them? No, we need an ID to track them.
+      const newPlayer: Player = {
+        id: senderId || 'unknown',
+        name: newPlayerName,
+        isHost: false,
+        status: 'LOBBY',
+        mistakes: 0
+      };
 
-      // CRITICAL FIX: The server relay passes data. 
-      // If we want to track players by ID, the Client MUST send their ID in the payload.
-      // The socketService.socket.id is available on client side.
+      setPlayers(prev => {
+        // 1. Check if EXACT same player ID is already here (Idempotency)
+        if (prev.find(p => p.id === newPlayer.id)) return prev;
 
-      // Let's assume we update JOIN_REQUEST payload to include ID if it's missing?
-      // OR we just rely on the fact that existing logic might want an ID.
-      // Let's look at `NetworkAction` type. usually just `name`.
+        // 2. Check if NAME is already taken (Ghost / Reconnect Logic)
+        // If name exists, we assume it's the same user reconnecting or a stale ghost.
+        // We REMOVE the old one and ADD the new one.
+        const filtered = prev.filter(p => p.name !== newPlayerName);
 
-      // For now, let's treat "name" as unique or just generate a random ID for them if we don't get one?
-      // No, that breaks communication.
-      // The sender should include their ID.
-      // I will assume the sender sends `action.payload.id` or similar if I modify the request?
-      // existing: `payload: { name }`.
-      // We need to hacking in an ID? 
-      // Actually, `useMultiplayer` called `conn.peer` to get ID. 
+        const updated = [...filtered, newPlayer];
 
-      // PLAN: When sending JOIN_REQUEST, include `id: socket.id` in payload.
-      // But `NetworkAction` type might be strict.
-      // Let's cast it or be flexible.
-
-      // For this migration, I will assume I can modify the payload slightly on send.
-    }
-
-    // ... Handlers ...
-
-    if (action.type === 'JOIN_REQUEST') {
-      // Host handles this
-      if (amIHost) {
-        // We need the Sender's ID.
-        // Let's assume payload has it.
-        const senderId = (action.payload as any).senderId;
-        const newPlayer: Player = {
-          id: senderId || 'unknown',
-          name: action.payload.name,
-          isHost: false,
-          status: 'LOBBY',
-          mistakes: 0
+        // Broadcast NEW LIST to everyone
+        const updateAction: NetworkAction = {
+          type: 'PLAYER_UPDATE',
+          payload: { players: updated }
         };
-
-        setPlayers(prev => {
-          if (prev.find(p => p.id === newPlayer.id)) return prev;
-          const updated = [...prev, newPlayer];
-
-          // Broadcast NEW LIST to everyone
-          const updateAction: NetworkAction = {
-            type: 'PLAYER_UPDATE',
-            payload: { players: updated }
-          };
-          broadcast(updateAction); // To everyone else
-          // Also update myself (Host)
-          onWorldUpdate(updated);
-          return updated;
-        });
-
-        // We also need to send "JOIN_ACCEPT" specifically to the new guy?
-        // Or just PLAYER_UPDATE is enough?
-        // Existing logic: Sent JOIN_ACCEPT. 
-        // Getting PLAYER_UPDATE is usually sufficient if it overwrites state.
-
-        // Let's send JOIN_ACCEPT via broadcast (lazy) or ignored if PLAYER_UPDATE works.
-        // PLAYER_UPDATE sets state.
-      }
+        broadcast(updateAction); // To everyone else
+        // Also update myself (Host)
+        onWorldUpdate(updated);
+        return updated;
+      });
     }
     else if (action.type === 'PLAYER_UPDATE') {
       setPlayers(action.payload.players);
@@ -261,6 +219,33 @@ export const useMultiplayer = (
           return updated;
         });
       }
+    }
+    else if (action.type === 'PLAYER_LEFT') {
+      const { playerId } = action.payload;
+
+      setPlayers(prev => {
+        const updated = prev.filter(p => p.id !== playerId);
+
+        // If I am Host, I need to broadcast this change to ensure sync
+        if (amIHost) {
+          const updateAction: NetworkAction = {
+            type: 'PLAYER_UPDATE',
+            payload: { players: updated }
+          };
+          broadcast(updateAction);
+          onWorldUpdate(updated);
+        } else {
+          // If I am client, I should verify if the Host just left
+          const host = prev.find(p => p.isHost);
+          if (host && host.id === playerId) {
+            console.warn("HOST DISCONNECTED");
+            setConnectionStatus('DISCONNECTED'); // Trigger disconnect UI
+            // Optionally trigger a specialized "Host Left" callback if desired
+          }
+          onWorldUpdate(updated);
+        }
+        return updated;
+      });
     }
 
   }, [amIHost, broadcast, onGameStart, onSpell, onSpellLog, onWorldUpdate, resolveName]);

@@ -49,8 +49,8 @@ io.on('connection', (socket) => {
             // Here we can just letting them be in the room is step 1.
             // Actual game logic payload will follow.
         } else {
-             // For now we can emit an error or just let them fail to connect
-             socket.emit('error', { message: 'Room not found' });
+            // For now we can emit an error or just let them fail to connect
+            socket.emit('error', { message: 'Room not found' });
         }
     });
 
@@ -71,10 +71,10 @@ io.on('connection', (socket) => {
 
     // We can also support specific events to match the frontend logic better if we want stricter types.
     // But a generic 'message' or 'action' event is flexible.
-    
+
     // Let's support the existing action types by just relaying them.
     // The frontend sends "action" objects.
-    
+
     socket.on('game_action', (data) => {
         const { roomId, action } = data;
         // Broadcast to everyone else in the room
@@ -82,11 +82,24 @@ io.on('connection', (socket) => {
             socket.to(roomId).emit('game_action', action);
         }
     });
-    
+
     // Special case for joining:
     // When a client joins, they might need to send a "JOIN_REQUEST" to the host.
     // The host is just another socket in the room.
     // So 'game_action' with type 'JOIN_REQUEST' works if everyone receives it.
+
+    socket.on('disconnecting', () => {
+        console.log("User Disconnecting:", socket.id);
+        // Notify all rooms this socket is in (except its own default room)
+        for (const room of socket.rooms) {
+            if (room !== socket.id) {
+                socket.to(room).emit('game_action', {
+                    type: 'PLAYER_LEFT',
+                    payload: { playerId: socket.id }
+                });
+            }
+        }
+    });
 
     socket.on('disconnect', () => {
         console.log("User Disconnected", socket.id);
