@@ -30,6 +30,7 @@ export const generateWord = async (banList: string[] = []): Promise<WordData> =>
       - ABSOLUTELY NO Slang or Local Dialects.
       - NO Proper Nouns (Names of people or specific places).
       - Word must be SINGLE WORD (or joined with underscores), NO SPACES.
+      - Word must be a SINGULAR NOUN (Absolute NO PLURALS like 'Cats', 'Houses', 'Trees').
       - Generated "hints" array must contain EXACTLY 5 simple English sentences progressively getting easier.
       
       Format (JSON ONLY, no markdown):

@@ -8,6 +8,8 @@ import { soundManager } from './utils/SoundManager';
 import { useMultiplayer } from './hooks/useMultiplayer';
 import { PlayerList } from './components/PlayerList';
 import { RulesModal } from './components/RulesModal';
+import { Auth } from './components/Auth';
+import { updateGameStats, supabase } from './utils/supabase';
 
 const MAX_MISTAKES = 5;
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
@@ -210,6 +212,23 @@ export default function App() {
 
   // --- Effects ---
 
+  // Autofill Username from Auth
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user?.email) {
+        const name = session.user.email.split('@')[0];
+        setUsername(name);
+      }
+    });
+
+    // Initial check
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.email) setUsername(user.email.split('@')[0]);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   // Game End Logic
   useEffect(() => {
     if (status === GameStatus.PLAYING) {
@@ -223,6 +242,9 @@ export default function App() {
         setTotalTimeTaken(newTotal);
 
         updateMyStatus('WON', wrongGuesses, guessedLetters, newTotal);
+
+        // Track Win Stats
+        updateGameStats(true, timeTaken, hasScared ? 1 : 0);
       } else if (isLost) {
         setStatus(GameStatus.LOST);
         soundManager.playLose();
@@ -236,6 +258,9 @@ export default function App() {
         setTotalTimeTaken(newTotal);
 
         updateMyStatus('LOST', wrongGuesses, guessedLetters, newTotal);
+
+        // Track Loss Stats
+        updateGameStats(false, timeTaken, hasScared ? 1 : 0);
       } else {
         // Still playing, report mistakes (and current accumulated time? No need until end)
         updateMyStatus('PLAYING', wrongGuesses, guessedLetters, totalTimeTaken);
@@ -630,10 +655,18 @@ export default function App() {
   if (gameMode === 'MENU') {
     return (
       <div className="relative w-full h-screen bg-slate-950 overflow-hidden text-slate-100 flex items-center justify-center">
+        {/* Auth Top Right */}
+        <div className="fixed top-6 right-6 z-50">
+          <Auth />
+        </div>
+
         <div className="absolute inset-0 z-0 opacity-50">
           <GameScene wrongGuesses={0} isWon={false} isLost={false} />
         </div>
         <div className="relative z-10 p-8 bg-black/80 backdrop-blur-md rounded-lg border border-red-900/50 text-center max-w-md w-full shadow-2xl shadow-red-900/20">
+
+
+
           <h1 className="text-6xl text-red-600 font-horror tracking-wider mb-2 drop-shadow-[0_0_15px_rgba(220,38,38,0.5)]">
             CURSED<span className="text-slate-100">MAN</span>
           </h1>
