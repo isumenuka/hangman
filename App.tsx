@@ -69,6 +69,7 @@ export default function App() {
   const [round, setRound] = useState(1);
   const [roundStartTime, setRoundStartTime] = useState<number>(0);
   const [totalTimeTaken, setTotalTimeTaken] = useState(0); // My Accumulative Time
+  const [totalScaresUsed, setTotalScaresUsed] = useState(0); // My Accumulative Scares
   const [showGameOver, setShowGameOver] = useState(false);
   const [showJumpscare, setShowJumpscare] = useState(false);
   const [currentJumpscareVideo, setCurrentJumpscareVideo] = useState('');
@@ -80,7 +81,10 @@ export default function App() {
     setRound(newRound); // Sync Round
     setRoundStartTime(Date.now()); // Start Timer!
     setStatus(GameStatus.PLAYING);
-    if (newRound === 1) setTotalTimeTaken(0); // Reset time for new tournament
+    if (newRound === 1) {
+      setTotalTimeTaken(0); // Reset time for new tournament
+      setTotalScaresUsed(0); // Reset scares for new tournament
+    }
     // setCurseEnergy(0); // KEPT POINTS PERSISTENT (User Request)
     setActiveDebuffs([]);
     setUnlockedHints(1); // Reset hints on new game
@@ -245,8 +249,8 @@ export default function App() {
 
         updateMyStatus('WON', wrongGuesses, guessedLetters, newTotal);
 
-        // Track Win Stats
-        updateGameStats(true, timeTaken, hasScared ? 1 : 0, username);
+        // Track Win Stats - MOVED TO TOURNAMENT END
+        // updateGameStats(true, timeTaken, hasScared ? 1 : 0, username);
       } else if (isLost) {
         setStatus(GameStatus.LOST);
         soundManager.playLose();
@@ -255,20 +259,32 @@ export default function App() {
         // If lost, maybe max time or penalty? For now, let's just count time spent trying.
         const timeTaken = Date.now() - roundStartTime;
         const newTotal = totalTimeTaken + timeTaken;
-        // NOTE: If they lost, they technically didn't guess it. 
-        // Maybe add penalty? User didn't specify. Assuming simply time spent.
         setTotalTimeTaken(newTotal);
 
         updateMyStatus('LOST', wrongGuesses, guessedLetters, newTotal);
 
-        // Track Loss Stats
-        updateGameStats(false, timeTaken, hasScared ? 1 : 0, username);
+        // Track Loss Stats - MOVED TO TOURNAMENT END
+        // updateGameStats(false, timeTaken, hasScared ? 1 : 0, username);
       } else {
         // Still playing, report mistakes (and current accumulated time? No need until end)
         updateMyStatus('PLAYING', wrongGuesses, guessedLetters, totalTimeTaken);
       }
     }
   }, [guessedLetters, isWon, isLost, status, wrongGuesses]); // Added dependencies safely
+
+  // Tournament End Stats Submission
+  useEffect(() => {
+    if (showGameOver && gameMode !== 'SINGLE') {
+      const sortedPlayers = [...players].sort((a, b) => (a.totalTime || 0) - (b.totalTime || 0));
+      const winner = sortedPlayers[0];
+
+      // Am I the winner?
+      const amIWinner = winner && winner.id === myId;
+
+      // Submit Tournament Stats
+      updateGameStats(amIWinner, totalTimeTaken, totalScaresUsed, username);
+    }
+  }, [showGameOver, gameMode, players, myId, totalTimeTaken, totalScaresUsed, username]);
 
   // Audio effect for guess
   const prevGuessLength = React.useRef(0);
@@ -522,7 +538,10 @@ export default function App() {
     setLastSpellCastTime(Date.now()); // Start Cooldown
     soundManager.playWin(); // temporary sound for casting
     soundManager.playWin(); // temporary sound for casting
-    if (spellToCast === 'JUMPSCARE') setHasScared(true);
+    if (spellToCast === 'JUMPSCARE') {
+      setHasScared(true);
+      setTotalScaresUsed(prev => prev + 1);
+    }
     // Close mobile list if open
     setShowMobileList(false);
   };
@@ -556,7 +575,11 @@ export default function App() {
     setWinnerPowersUsed(prev => ({ ...prev, [spell]: true }));
 
     soundManager.playWin(); // Feedback sound
-    if (spell === 'JUMPSCARE') setHasScared(true);
+    soundManager.playWin(); // Feedback sound
+    if (spell === 'JUMPSCARE') {
+      setHasScared(true);
+      setTotalScaresUsed(prev => prev + 1);
+    }
   };
 
   // Spectator Helper
