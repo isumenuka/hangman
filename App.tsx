@@ -9,6 +9,7 @@ import { useMultiplayer } from './hooks/useMultiplayer';
 import { PlayerList } from './components/PlayerList';
 import { RulesModal } from './components/RulesModal';
 import { Auth } from './components/Auth';
+import { GlobalLeaderboard } from './components/GlobalLeaderboard';
 import { updateGameStats, supabase } from './utils/supabase';
 
 const MAX_MISTAKES = 5;
@@ -37,6 +38,7 @@ export default function App() {
   const [joinInputId, setJoinInputId] = useState('');
   const [showMobileList, setShowMobileList] = useState(false);
   const [showRules, setShowRules] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
 
   // --- Sabotage State ---
   const [curseEnergy, setCurseEnergy] = useState(20);
@@ -244,7 +246,7 @@ export default function App() {
         updateMyStatus('WON', wrongGuesses, guessedLetters, newTotal);
 
         // Track Win Stats
-        updateGameStats(true, timeTaken, hasScared ? 1 : 0);
+        updateGameStats(true, timeTaken, hasScared ? 1 : 0, username);
       } else if (isLost) {
         setStatus(GameStatus.LOST);
         soundManager.playLose();
@@ -260,7 +262,7 @@ export default function App() {
         updateMyStatus('LOST', wrongGuesses, guessedLetters, newTotal);
 
         // Track Loss Stats
-        updateGameStats(false, timeTaken, hasScared ? 1 : 0);
+        updateGameStats(false, timeTaken, hasScared ? 1 : 0, username);
       } else {
         // Still playing, report mistakes (and current accumulated time? No need until end)
         updateMyStatus('PLAYING', wrongGuesses, guessedLetters, totalTimeTaken);
@@ -686,9 +688,17 @@ export default function App() {
             >
               <HelpCircle size={20} /> RITUAL GUIDE
             </button>
+
+            <button
+              onClick={() => setShowLeaderboard(true)}
+              className="py-3 bg-yellow-950/40 hover:bg-yellow-900/60 text-yellow-500 rounded font-bold border-l-4 border-yellow-700 transition-all flex items-center justify-center gap-2"
+            >
+              <Trophy size={20} /> GLOBAL LEADERBOARD
+            </button>
           </div>
 
           <RulesModal isOpen={showRules} onClose={() => setShowRules(false)} />
+          <GlobalLeaderboard isOpen={showLeaderboard} onClose={() => setShowLeaderboard(false)} />
         </div>
       </div>
     );

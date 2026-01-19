@@ -13,6 +13,7 @@ export const supabase = createClient(supabaseUrl || '', supabaseKey || '');
 // --- Types ---
 export interface PlayerStats {
     id: string;
+    username: string; // New
     wins: number;
     games_played: number;
     best_time_ms: number | null;
@@ -29,14 +30,28 @@ export const getStats = async (userId: string): Promise<PlayerStats | null> => {
         .single();
 
     if (error) {
-        if (error.code === 'PGRST116') return { id: userId, wins: 0, games_played: 0, best_time_ms: null, total_scares: 0 }; // Default
+        if (error.code === 'PGRST116') return { id: userId, username: 'Anonymous', wins: 0, games_played: 0, best_time_ms: null, total_scares: 0 }; // Default
         console.error('Error fetching stats:', error);
         return null;
     }
     return data;
 };
 
-export const updateGameStats = async (isWin: boolean, timeTaken: number, scaresUsed: number) => {
+export const getLeaderboard = async (): Promise<PlayerStats[]> => {
+    const { data, error } = await supabase
+        .from('player_stats')
+        .select('*')
+        .order('wins', { ascending: false })
+        .limit(50); // Top 50
+
+    if (error) {
+        console.error('Error fetching leaderboard:', error);
+        return [];
+    }
+    return data || [];
+};
+
+export const updateGameStats = async (isWin: boolean, timeTaken: number, scaresUsed: number, username: string) => {
     // 1. Get Current User
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -46,13 +61,12 @@ export const updateGameStats = async (isWin: boolean, timeTaken: number, scaresU
         p_user_id: user.id,
         p_is_win: isWin,
         p_time_taken: timeTaken,
-        p_scares_used: scaresUsed
+        p_scares_used: scaresUsed,
+        p_username: username // New Arg
     });
 
     if (rpcError) {
         console.warn("RPC Failed (update_game_stats), checking fallback...", rpcError);
-        // Fallback or retry logic could go here, but usually RPC is safest.
-        // If RPC fails (e.g. function doesn't exist yet), we might just log it.
         console.error("Make sure to run the update_stats_schema.sql script in Supabase!");
     }
 }
