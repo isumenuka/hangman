@@ -42,32 +42,51 @@ export const generateWord = async (banList: string[] = []): Promise<WordData> =>
       }
     `;
 
-    const response = await mistral.chat.complete({
-      model: "mistral-small-latest",
-      messages: [
-        {
-          content: prompt,
-          role: "user",
+    let attempts = 0;
+    const MAX_ATTEMPTS = 3;
+
+    while (attempts < MAX_ATTEMPTS) {
+      attempts++;
+      const response = await mistral.chat.complete({
+        model: "mistral-small-latest",
+        messages: [
+          {
+            content: prompt,
+            role: "user",
+          },
+        ],
+        responseFormat: {
+          type: "json_object"
         },
-      ],
-      responseFormat: {
-        type: "json_object"
-      },
-      temperature: 0.9, // High creativity/randomness
-    });
+        temperature: 0.9 + (attempts * 0.05), // Increase randomness on retry
+      });
 
-    const text = response.choices?.[0]?.message?.content;
-    if (!text) throw new Error("No response from AI");
+      const text = response.choices?.[0]?.message?.content;
+      if (!text) throw new Error("No response from AI");
 
-    const data = JSON.parse(text);
-    console.log("Mistral Generated:", data);
+      const data = JSON.parse(text);
 
-    return {
-      word: data.word.toUpperCase().replace(/\s+/g, '_'),
-      hint: data.hint,
-      difficulty: data.difficulty || "Medium",
-      hints: data.hints || []
-    };
+      const candidateWord = data.word.toUpperCase().replace(/\s+/g, '_');
+
+      // Strict Client-Side Filter
+      if (banList.map(w => w.toUpperCase()).includes(candidateWord)) {
+        console.warn(`[WordGenerator] Duplicate word generated: ${candidateWord}. Retrying (${attempts}/${MAX_ATTEMPTS})...`);
+        continue;
+      }
+
+      console.log("Mistral Generated:", data);
+
+      return {
+        word: candidateWord,
+        hint: data.hint,
+        difficulty: data.difficulty || "Medium",
+        hints: data.hints || []
+      };
+    }
+
+    throw new Error("FAILED_TO_GENERATE_UNIQUE_WORD");
+
+
 
   } catch (error: any) {
     console.error("Mistral Service Error:", error);
