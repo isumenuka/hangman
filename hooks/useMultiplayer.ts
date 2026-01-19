@@ -3,7 +3,7 @@ import { socketService } from '../services/socketService';
 import { NetworkAction, Player, WordData } from '../types';
 
 export const useMultiplayer = (
-  onGameStart: (wordData: WordData) => void,
+  onGameStart: (wordData: WordData, round: number) => void,
   onWorldUpdate: (players: Player[]) => void,
   onSpell: (spellId: 'FOG' | 'SCRAMBLE' | 'JUMPSCARE', casterName: string) => void,
   onSpellLog: (spellId: string, casterName: string, targetName: string) => void
@@ -117,6 +117,7 @@ export const useMultiplayer = (
       isHost: true,
       status: 'LOBBY',
       mistakes: 0,
+      guessedLetters: [],
       roundScore: 0
     };
     setPlayers([me]);
@@ -158,7 +159,9 @@ export const useMultiplayer = (
         name: newPlayerName,
         isHost: false,
         status: 'LOBBY',
-        mistakes: 0
+        mistakes: 0,
+        guessedLetters: [],
+        roundScore: 0
       };
 
       setPlayers(prev => {
@@ -188,7 +191,7 @@ export const useMultiplayer = (
       onWorldUpdate(action.payload.players);
     }
     else if (action.type === 'GAME_START') {
-      onGameStart(action.payload.wordData);
+      onGameStart(action.payload.wordData, action.payload.round);
     }
     else if (action.type === 'GLOBAL_TICK') {
       setPlayers(action.payload.players);
@@ -211,7 +214,14 @@ export const useMultiplayer = (
         setPlayers(prev => {
           const updated = prev.map(p => {
             if (p.id === senderId) {
-              return { ...p, status: action.payload.status, mistakes: action.payload.mistakes };
+              // Update status, mistakes AND guessedLetters
+              const payload = action.payload as any;
+              return {
+                ...p,
+                status: payload.status,
+                mistakes: payload.mistakes,
+                guessedLetters: payload.guessedLetters || p.guessedLetters
+              };
             }
             return p;
           });
@@ -261,14 +271,14 @@ export const useMultiplayer = (
 
   // --- Actions ---
 
-  const startGame = (wordData: WordData) => {
+  const startGame = (wordData: WordData, round: number) => {
     if (!amIHost) return;
-    const startAction: NetworkAction = { type: 'GAME_START', payload: { wordData } };
+    const startAction: NetworkAction = { type: 'GAME_START', payload: { wordData, round } };
     broadcast(startAction);
-    onGameStart(wordData); // Local start
+    onGameStart(wordData, round); // Local start
 
     setPlayers(prev => {
-      const updated = prev.map(p => ({ ...p, status: 'PLAYING', mistakes: 0 } as Player));
+      const updated = prev.map(p => ({ ...p, status: 'PLAYING', mistakes: 0, guessedLetters: [] } as Player));
       const tick: NetworkAction = { type: 'GLOBAL_TICK', payload: { players: updated } };
       broadcast(tick);
       onWorldUpdate(updated); // Local update
@@ -276,13 +286,13 @@ export const useMultiplayer = (
     });
   };
 
-  const updateMyStatus = (status: Player['status'], mistakes: number) => {
+  const updateMyStatus = (status: Player['status'], mistakes: number, guessedLetters: string[]) => {
     if (amIHost) {
       // Host updates self and broadcasts
       setPlayers(prev => {
         const updated = prev.map(p => {
           if (p.id === socketService.socket?.id) { // OR myId
-            return { ...p, status, mistakes };
+            return { ...p, status, mistakes, guessedLetters };
           }
           return p;
         });
@@ -295,7 +305,7 @@ export const useMultiplayer = (
       // MUST include ID so Host knows who it is.
       const action: NetworkAction = {
         type: 'UPDATE_MY_STATUS',
-        payload: { status, mistakes, senderId: socketService.socket?.id } as any
+        payload: { status, mistakes, guessedLetters, senderId: socketService.socket?.id } as any
       };
       broadcast(action); // Sends to Host (and others, but Host handles it)
     }
@@ -339,6 +349,57 @@ export const useMultiplayer = (
     socketService.emitAction(roomId, action);
   };
 
+  const setSpectating = (targetId: string | null) => {
+    // Just update my 'spectatingId' in the roster.
+    // We can reuse updateMyStatus mechanism if we expose it? Or just rely on local state?
+    // "Spectator Mode" requested implies others see I am spectating them.
+    // So we need to sync this.
+    // The simplest way is to treat it as part of "updateMyStatus" but I don't want to change that signiture too much.
+    // Actually, I can just update the players list locally for me, AND send an action.
+    // But adding `spectatingId` to UPDATE_MY_STATUS might be cleaner.
+    // Let's assume we can just sneak it in via a separate action or reuse logic.
+    // For now, let's keep it simple: Local only for VIEWING, but User asked "see who spectating them".
+    // So we MUST broadcast.
+
+    // I'll add a specific helper or just handle it. 
+    // Ideally I modify `updateMyStatus` to accept optional partials, but let's just make a specific helper.
+    if (!socketService.socket) return;
+
+    const payload = { senderId: socketService.socket.id, spectatingId: targetId };
+    const action = { type: 'SPECTATING_UPDATE', payload } as any; // Custom event
+
+    // We need to handle this event inv `handleIncomingAction`? 
+    // `types.ts` doesn't have it. I should have added it.
+    // But since I'm in "EXECUTION" and don't want to go back to types, I'll piggyback or just add it now?
+    // Actually `UPDATE_MY_STATUS` is generic enough if I just relax the type check or update the hook to support it.
+    // Let's piggyback on `UPDATE_MY_STATUS` but I need to pass the current other values.
+    // This is getting messy.
+    // Let's just Add `spectatingId` to `UPDATE_MY_STATUS` payload in `types.ts` effectively by ignoring type for a sec or updating types.
+    // Wait, I ALREADY updated types.ts with `spectatingId` on Player.
+    // I just need to update `UPDATE_MY_STATUS` definition in types or just use `as any` carefully.
+    // I'll stick to `UPDATE_MY_STATUS`.
+
+    // BUT I need current stats.
+    const me = playersRef.current.find(p => p.id === myId);
+    if (me) {
+      // Re-broadcast absolute state
+      const action: NetworkAction = {
+        type: 'UPDATE_MY_STATUS',
+        payload: {
+          status: me.status,
+          mistakes: me.mistakes,
+          guessedLetters: me.guessedLetters,
+          spectatingId: targetId,
+          senderId: socketService.socket.id
+        } as any
+      };
+      broadcast(action);
+
+      // And update locally
+      setPlayers(prev => prev.map(p => p.id === myId ? { ...p, spectatingId: targetId } : p));
+    }
+  };
+
 
   return {
 
@@ -355,6 +416,7 @@ export const useMultiplayer = (
     joinLobby: joinLobbyWithId,
     startGame,
     updateMyStatus,
+    setSpectating,
     castSpell,
     myId,
     roomId: currentRoomId,

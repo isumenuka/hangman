@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { GameScene } from './components/Scene';
 import { generateWord } from './services/wordGenerator';
 import { GameStatus, WordData, Player } from './types';
-import { Play, RotateCcw, HelpCircle, Loader2, Trophy, Skull, Users, Copy, Link, User } from 'lucide-react';
+import { Play, RotateCcw, HelpCircle, Loader2, Trophy, Skull, Users, Copy, Link, User, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import clsx from 'clsx';
 import { soundManager } from './utils/SoundManager';
 import { useMultiplayer } from './hooks/useMultiplayer';
@@ -37,7 +37,13 @@ export default function App() {
   const [activeDebuffs, setActiveDebuffs] = useState<('FOG' | 'SCRAMBLE')[]>([]);
   const [scrambleSeed, setScrambleSeed] = useState(0); // Triggers re-shuffle
   const [spellToCast, setSpellToCast] = useState<'FOG' | 'SCRAMBLE' | 'JUMPSCARE' | null>(null); // For targeting mode
-  const [jumpscareVideo, setJumpscareVideo] = useState<string | null>(null);
+  // Spectator State
+  const [spectatingTargetId, setSpectatingTargetId] = useState<string | null>(null);
+  const [autoNextRoundCountdown, setAutoNextRoundCountdown] = useState<number | null>(null);
+  // Free Winner Powers (Tracking usage)
+  const [winnerPowersUsed, setWinnerPowersUsed] = useState<{ FOG: boolean, SCRAMBLE: boolean, JUMPSCARE: boolean }>({ FOG: false, SCRAMBLE: false, JUMPSCARE: false });
+
+
 
 
   // Game Log (Persistant Notifications)
@@ -53,14 +59,16 @@ export default function App() {
   const [showGameOver, setShowGameOver] = useState(false);
 
   // Callbacks for Network
-  const handleGameStart = useCallback((data: WordData) => {
+  const handleGameStart = useCallback((data: WordData, newRound: number) => {
     setWordData(data);
     setGuessedLetters([]);
+    setRound(newRound); // Sync Round
     setStatus(GameStatus.PLAYING);
     // setCurseEnergy(0); // KEPT POINTS PERSISTENT (User Request)
     setActiveDebuffs([]);
     setUnlockedHints(1); // Reset hints on new game
     setHasScared(false); // Reset scare usage
+    setWinnerPowersUsed({ FOG: false, SCRAMBLE: false, JUMPSCARE: false }); // Reset free powers
     soundManager.playAmbient();
     soundManager.playClick();
 
@@ -75,12 +83,7 @@ export default function App() {
     soundManager.playWrong();
 
     if (spellId === 'JUMPSCARE') {
-      const videos = [
-        'vlipsy-creepy-face-jump-scare-3hEsFXt9.mp4',
-        'vlipsy-jump-scare-creepy-doll-nwbQ9bDF.mp4',
-        'vlipsy-winterrowd-jump-scare-IGMSPmB8.mp4'
-      ];
-      setJumpscareVideo(videos[Math.floor(Math.random() * videos.length)]);
+      // Jumpscare disabled
       return;
     }
 
@@ -120,18 +123,38 @@ export default function App() {
   // (In JSX, replacing the Toast block)
 
 
-  const { initializePeer, joinLobby, startGame, updateMyStatus, castSpell, myId, roomId, players, connectionStatus, amIHost } = useMultiplayer(handleGameStart, handleWorldUpdate, handleSpellReceived, handleSpellLog);
+  const { initializePeer, joinLobby, startGame, updateMyStatus, castSpell, setSpectating, myId, roomId, players, connectionStatus, amIHost } = useMultiplayer(handleGameStart, handleWorldUpdate, handleSpellReceived, handleSpellLog);
 
   // Check if Round 5 is complete (all players won/lost)
   useEffect(() => {
-    if (round === 5 && gameMode !== 'SINGLE') {
-      const allFinished = players.every(p => p.status === 'WON' || p.status === 'LOST');
-      if (allFinished && players.length > 0 && !showGameOver) {
-        // Small delay for dramatic effect
-        setTimeout(() => setShowGameOver(true), 2000);
+    // Only Host manages flow
+    if (!amIHost || gameMode === 'SINGLE' || players.length === 0) return;
+
+    // Check if EVERYONE is finished (WON or LOST)
+    const allFinished = players.every(p => p.status === 'WON' || p.status === 'LOST');
+
+    if (allFinished && status !== GameStatus.IDLE && !showGameOver) {
+      // Auto-Next Round Sequence
+      if (autoNextRoundCountdown === null) {
+        setAutoNextRoundCountdown(5); // Start 5s timer
+      } else if (autoNextRoundCountdown > 0) {
+        const timer = setTimeout(() => setAutoNextRoundCountdown(c => (c !== null ? c - 1 : 0)), 1000);
+        return () => clearTimeout(timer);
+      } else {
+        // Timer hit 0
+        if (round < 5) {
+          handleStartGame(); // Auto next round
+          setAutoNextRoundCountdown(null);
+        } else {
+          setShowGameOver(true);
+          setAutoNextRoundCountdown(null);
+        }
       }
+    } else {
+      // Reset if condition breaks (e.g. new player joins?)
+      if (autoNextRoundCountdown !== null && !showGameOver) setAutoNextRoundCountdown(null);
     }
-  }, [round, players, gameMode, showGameOver]);
+  }, [round, players, gameMode, showGameOver, amIHost, status, autoNextRoundCountdown]);
 
   // Derived State
   const wrongGuesses = guessedLetters.filter(l =>
@@ -156,10 +179,10 @@ export default function App() {
       } else if (isLost) {
         setStatus(GameStatus.LOST);
         soundManager.playLose();
-        updateMyStatus('LOST', wrongGuesses);
+        updateMyStatus('LOST', wrongGuesses, guessedLetters);
       } else {
         // Still playing, report mistakes
-        updateMyStatus('PLAYING', wrongGuesses);
+        updateMyStatus('PLAYING', wrongGuesses, guessedLetters);
       }
     }
   }, [guessedLetters, isWon, isLost, status, wrongGuesses]); // Added updateMyStatus to dep might be loop safe if stable
@@ -232,9 +255,15 @@ export default function App() {
     soundManager.playClick();
     setLoading(true);
     // Increment Round if we are already playing/played
+    let nextRound = round;
     if (status !== GameStatus.IDLE) {
-      setRound(r => r + 1);
+      nextRound = round + 1;
+      setRound(nextRound);
+    } else {
+      // If IDLE (first game?), default 1 or keep?
+      // If we just loaded, round is 1.
     }
+
     setStatus(GameStatus.IDLE);
     setUnlockedHints(1); // Reset hints on new game
 
@@ -265,7 +294,7 @@ export default function App() {
         // ... unused logic kept for type safety ...
         setWordData(enhancedData);
       } else if (amIHost) {
-        startGame(enhancedData);
+        startGame(enhancedData, nextRound);
         setWordData(enhancedData);
         setGuessedLetters([]);
         setStatus(GameStatus.PLAYING);
@@ -410,7 +439,60 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleGuess, gameMode, status]);
+
+  // Winner Power Logic
+  const castWinnerSpell = (spell: 'FOG' | 'SCRAMBLE' | 'JUMPSCARE') => {
+    if (!spectatingTargetId || status !== GameStatus.WON) return;
+    if (winnerPowersUsed[spell]) return;
+
+    // Cast spell directly on target (bypass point cost)
+    castSpell(spell, spectatingTargetId);
+
+    // Mark as used
+    setWinnerPowersUsed(prev => ({ ...prev, [spell]: true }));
+
+    soundManager.playWin(); // Feedback sound
+    if (spell === 'JUMPSCARE') setHasScared(true);
+  };
+
+  // Spectator Helper
+  const targetPlayer = spectatingTargetId ? players.find(p => p.id === spectatingTargetId) : null;
+  // If spectating, use THEIR wrongGuesses, otherwise mine
+  const displayWrongGuesses = targetPlayer ? targetPlayer.mistakes : wrongGuesses;
+  // If spectating, we might want to see THEIR board?
+  // We need to render THEIR word state.
+  // We have `targetPlayer.guessedLetters`.
+  const displayGuessedLetters = targetPlayer ? targetPlayer.guessedLetters : guessedLetters;
+
+  // Also who is watching ME?
+  const mySpectators = players.filter(p => p.spectatingId === myId).map(p => p.name);
+
+  // Cycle Spectator
+  const cycleSpectator = (direction: -1 | 1) => {
+    if (!spectatingTargetId) return;
+
+    // Get list of valid targets (ACTIVE players, excluding me)
+    const validTargets = players.filter(p => p.id !== myId && p.status === 'PLAYING');
+    if (validTargets.length === 0) return;
+
+    const currentIndex = validTargets.findIndex(p => p.id === spectatingTargetId);
+    if (currentIndex === -1) {
+      // If current target is no longer valid (e.g. they died or disconnected), pick first
+      setSpectatingTargetId(validTargets[0].id);
+      setSpectating(validTargets[0].id);
+      return;
+    }
+
+    let nextIndex = currentIndex + direction;
+    if (nextIndex < 0) nextIndex = validTargets.length - 1;
+    if (nextIndex >= validTargets.length) nextIndex = 0;
+
+    const nextTarget = validTargets[nextIndex];
+    setSpectatingTargetId(nextTarget.id);
+    setSpectating(nextTarget.id);
+  };
 
   const copyToClipboard = () => {
     if (roomId) {
@@ -432,7 +514,7 @@ export default function App() {
               className={clsx(
                 "w-8 h-10 md:w-12 md:h-14 border-b-4 flex items-center justify-center text-2xl md:text-4xl font-horror transition-all duration-300 drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]",
                 isGuessed ? "border-slate-500 text-red-100" : "border-slate-800 text-transparent",
-                status === GameStatus.LOST && !guessedLetters.includes(char) && "text-red-600 border-red-900"
+                (status === GameStatus.LOST || (spectatingTargetId && targetPlayer?.status === 'LOST')) && !displayGuessedLetters.includes(char) && "text-red-600 border-red-900"
               )}
             >
               {isGuessed ? char : '_'}
@@ -721,19 +803,26 @@ export default function App() {
       {/* Mobile: Top 40%, Desktop: Flex Grow (Remaining Space) */}
       <div className="relative w-full h-[40vh] lg:h-full lg:flex-1 bg-black z-0 order-1 shadow-2xl lg:shadow-none">
         {/* JUMPSCARE OVERLAY */}
-        {jumpscareVideo && (
-          <div className="fixed inset-0 z-[9999] bg-black flex items-center justify-center">
-            <video
-              src={`/jumpscare/${jumpscareVideo}`}
-              autoPlay
-              className="w-full h-full object-cover"
-              onEnded={() => setJumpscareVideo(null)}
-              onError={() => setJumpscareVideo(null)}
-            />
-          </div>
-        )}
+        {/* Jumpscare Removed */}
 
-        <GameScene isWon={status === GameStatus.WON} isLost={status === GameStatus.LOST} wrongGuesses={wrongGuesses} />
+        {/* Jumpscare Removed */}
+
+        <GameScene isWon={status === GameStatus.WON || (!!targetPlayer && targetPlayer.status === 'WON')} isLost={status === GameStatus.LOST || (!!targetPlayer && targetPlayer.status === 'LOST')} wrongGuesses={displayWrongGuesses} />
+
+        {/* Spectator Overlay */}
+
+
+        {/* Next Round Countdown Overlay */}
+        {autoNextRoundCountdown !== null && (
+          <div className="absolute inset-0 z-[50] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="text-center">
+              <h2 className="text-4xl font-horror text-red-500 mb-2">ROUND OVER</h2>
+              <p className="text-slate-300 mb-4">Prepare for the next ritual...</p>
+              <div className="text-6xl font-bold text-white animate-ping">{autoNextRoundCountdown}</div>
+            </div>
+          </div>
+        )
+        }
 
         {/* Persistent Game Log (Top Left of 3D Scene) */}
         <div className="absolute top-4 left-4 z-[10] w-full max-w-md pointer-events-none flex flex-col gap-1">
@@ -772,6 +861,12 @@ export default function App() {
                 {gameMode !== 'SINGLE' && (
                   <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
                     <User size={12} /> <span className="uppercase tracking-wider font-bold">{username}</span>
+                    <User size={12} /> <span className="uppercase tracking-wider font-bold">{username}</span>
+                  </div>
+                )}
+                {mySpectators.length > 0 && (
+                  <div className="flex items-center gap-1 text-[10px] text-red-400 mt-1 animate-pulse">
+                    <span>👁️</span> {mySpectators.length} watching
                   </div>
                 )}
                 {/* Round Badge */}
@@ -821,16 +916,17 @@ export default function App() {
                 <div className="flex flex-wrap justify-center gap-2">
                   {wordData?.word.split('').map((char, idx) => {
                     if (char === ' ') return <div key={idx} className="w-3" />;
-                    const isGuessed = guessedLetters.includes(char) || status === GameStatus.LOST;
+                    const isGuessed = displayGuessedLetters.includes(char) || status === GameStatus.LOST || (targetPlayer?.status === 'LOST');
                     return (
                       <span
                         key={idx}
                         className={clsx(
                           "w-8 h-10 border-b-2 flex items-center justify-center text-2xl font-horror transition-all duration-300",
                           isGuessed ? "border-slate-500 text-red-100" : "border-slate-800 text-transparent",
-                          status === GameStatus.LOST && !guessedLetters.includes(char) && "text-red-600 border-red-900"
+                          (status === GameStatus.LOST || (targetPlayer?.status === 'LOST')) && !displayGuessedLetters.includes(char) && "text-red-600 border-red-900"
                         )}
                       >
+
                         {isGuessed ? char : '_'}
                       </span>
                     );
@@ -989,18 +1085,43 @@ export default function App() {
 
           </div>
 
-          {/* Restart Button */}
-          {(gameMode === 'SINGLE' || amIHost) && status !== GameStatus.IDLE && status !== GameStatus.PLAYING && (
+          {/* Restart Button - HIDDEN for Host in Multiplayer if not everyone finished (controlled by auto-logic) */}
+          {/* Actually, Host can force start if they really want? But user asked "Wait for all". Let's hide it or disable it. */}
+          {(gameMode === 'SINGLE' || (amIHost && players.every(p => p.status !== 'PLAYING'))) && status !== GameStatus.IDLE && status !== GameStatus.PLAYING && (
             <button
               onClick={handleStartGame}
+              // Disable if countdown is running to prevent double click? Or let it override?
               className="mt-6 w-full py-3 bg-red-900 hover:bg-red-800 text-white font-bold rounded flex items-center justify-center gap-2 transition-colors border-t border-red-700"
             >
               <RotateCcw size={18} /> {status === GameStatus.WON || status === GameStatus.LOST ? `START ROUND ${round + 1}` : 'RESTART RITUAL'}
             </button>
           )}
+
+
+          {/* Spectator Controls (If dead/won) */}
+          {(status === GameStatus.WON || status === GameStatus.LOST) && !spectatingTargetId && gameMode !== 'SINGLE' && (
+            <div className="mt-4 p-4 bg-slate-900/80 border border-slate-700 rounded">
+              <h3 className="text-slate-400 text-xs uppercase font-bold mb-2">Spectate Players</h3>
+              <div className="flex flex-wrap gap-2">
+                {players.filter(p => p.id !== myId && p.status === 'PLAYING').map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => { setSpectatingTargetId(p.id); setSpectating(p.id); }}
+                    className="text-xs bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded flex items-center gap-2 border border-slate-600"
+                  >
+                    <User size={12} /> {p.name}
+                  </button>
+                ))}
+                {players.filter(p => p.id !== myId && p.status === 'PLAYING').length === 0 && (
+                  <span className="text-slate-600 text-xs italic">No active players to watch.</span>
+                )}
+              </div>
+            </div>
+          )}
+
           {gameMode !== 'SINGLE' && !amIHost && status !== GameStatus.IDLE && status !== GameStatus.PLAYING && (
             <div className="mt-6 text-center text-slate-500 text-xs uppercase tracking-widest animate-pulse">
-              Waiting for Host...
+              {autoNextRoundCountdown !== null ? `Starting Round ${round + 1} in ${autoNextRoundCountdown}...` : "Waiting for all players..."}
             </div>
           )}
 
@@ -1069,6 +1190,173 @@ export default function App() {
         )}
       </div>
 
+      {/* Spectator Window Modal */}
+      {spectatingTargetId && targetPlayer && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-300">
+          <div className="w-full max-w-5xl bg-slate-950 border-2 border-red-600 rounded-lg shadow-2xl shadow-red-900/50 flex flex-col h-[85vh] overflow-hidden">
+
+            {/* Window Header */}
+            <div className="flex items-center justify-between p-2 md:p-4 bg-red-950/30 border-b border-red-900/50 shrink-0">
+              <div className="flex items-center gap-2 md:gap-4 overflow-hidden">
+                <button onClick={() => cycleSpectator(-1)} className="p-2 bg-black/40 hover:bg-red-900/40 rounded text-red-200 transition-colors shrink-0">
+                  <ChevronLeft size={20} />
+                </button>
+                <div className="text-center overflow-hidden">
+                  <div className="text-[10px] md:text-xs text-red-400 font-bold tracking-[0.2em] uppercase truncate">SPECTATING</div>
+                  <div className="text-lg md:text-2xl font-horror text-white tracking-wider truncate max-w-[120px] md:max-w-xs">{targetPlayer.name}</div>
+                </div>
+                <button onClick={() => cycleSpectator(1)} className="p-2 bg-black/40 hover:bg-red-900/40 rounded text-red-200 transition-colors shrink-0">
+                  <ChevronRight size={20} />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 md:gap-4 shrink-0">
+                {/* Status Badge */}
+                <div className={clsx(
+                  "px-2 py-1 md:px-3 md:py-1 rounded text-[10px] md:text-xs font-bold uppercase tracking-wider border",
+                  targetPlayer.status === 'WON' ? "bg-green-950 text-green-400 border-green-800" :
+                    targetPlayer.status === 'LOST' ? "bg-red-950 text-red-400 border-red-800" :
+                      "bg-blue-950 text-blue-400 border-blue-800"
+                )}>
+                  {targetPlayer.status}
+                </div>
+
+                <button
+                  onClick={() => { setSpectatingTargetId(null); setSpectating(null); }}
+                  className="p-2 md:px-4 md:py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded font-bold transition-colors border border-slate-600 flex items-center justify-center"
+                >
+                  <span className="hidden md:inline">CLOSE VIEW</span>
+                  <X size={20} className="md:hidden" />
+                </button>
+              </div>
+            </div>
+
+            {/* Window Body */}
+            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+
+              {/* Visuals (Scene) */}
+              <div className="flex-1 bg-black relative min-h-[30vh] md:min-h-[40vh]">
+                <GameScene
+                  isWon={targetPlayer.status === 'WON'}
+                  isLost={targetPlayer.status === 'LOST'}
+                  wrongGuesses={targetPlayer.mistakes}
+                />
+              </div>
+
+              {/* Controls / Info (Right Panel) */}
+              <div className="w-full lg:w-[400px] bg-slate-900/50 border-t lg:border-t-0 lg:border-l border-slate-800 p-6 flex flex-col overflow-y-auto">
+
+                {/* Target's Word Progress */}
+                <div className="mb-8">
+                  <h3 className="text-slate-500 text-xs uppercase font-bold tracking-widest mb-4">Target's Ritual</h3>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {wordData?.word.split('').map((char, idx) => {
+                      if (char === ' ') return <div key={idx} className="w-4" />;
+                      const isGuessed = targetPlayer.guessedLetters.includes(char) || targetPlayer.status === 'LOST';
+                      // Checking "LOST" logic to reveal word if they lost
+                      return (
+                        <span
+                          key={idx}
+                          className={clsx(
+                            "w-8 h-10 border-b-2 flex items-center justify-center text-xl font-horror transition-all",
+                            isGuessed ? "border-slate-500 text-slate-200" : "border-slate-800 text-transparent",
+                            (targetPlayer.status === 'LOST') && !targetPlayer.guessedLetters.includes(char) && "text-red-600 border-red-900"
+                          )}
+                        >
+                          {isGuessed ? char : '_'}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Target's Inputs (Keyboard) */}
+                <div className="mb-6">
+                  <h3 className="text-slate-500 text-xs uppercase font-bold tracking-widest mb-4">Keyboard State</h3>
+                  <div className="grid grid-cols-7 gap-1 opacity-80 pointer-events-none">
+                    {ALPHABET.map(letter => {
+                      const isGuessed = targetPlayer.guessedLetters.includes(letter);
+                      const isCorrect = wordData?.word.includes(letter);
+                      return (
+                        <div
+                          key={letter}
+                          className={clsx(
+                            "aspect-square rounded flex items-center justify-center font-bold text-xs border",
+                            isGuessed
+                              ? (isCorrect ? "bg-green-900/40 text-green-500 border-green-800" : "bg-red-900/30 text-red-500 border-red-900/50")
+                              : "bg-slate-800 text-slate-600 border-slate-700"
+                          )}
+                        >
+                          {letter}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Winner Powers & Mistakes */}
+                <div className="mt-auto space-y-4">
+                  {status === GameStatus.WON && (
+                    <div className="bg-red-950/20 p-4 rounded border border-red-900/30">
+                      <h3 className="text-red-400 text-[10px] uppercase font-bold tracking-widest mb-3 flex items-center gap-2">
+                        <Trophy size={12} /> Winner Powers
+                      </h3>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => castWinnerSpell('FOG')}
+                          disabled={winnerPowersUsed.FOG}
+                          className={clsx(
+                            "flex-1 py-2 text-[10px] font-bold uppercase rounded border transition-all",
+                            winnerPowersUsed.FOG
+                              ? "bg-slate-900 text-slate-600 border-slate-800 cursor-not-allowed"
+                              : "bg-purple-900/40 hover:bg-purple-800 text-purple-300 border-purple-500/50"
+                          )}
+                        >
+                          Fog
+                        </button>
+                        <button
+                          onClick={() => castWinnerSpell('SCRAMBLE')}
+                          disabled={winnerPowersUsed.SCRAMBLE}
+                          className={clsx(
+                            "flex-1 py-2 text-[10px] font-bold uppercase rounded border transition-all",
+                            winnerPowersUsed.SCRAMBLE
+                              ? "bg-slate-900 text-slate-600 border-slate-800 cursor-not-allowed"
+                              : "bg-orange-900/40 hover:bg-orange-800 text-orange-300 border-orange-500/50"
+                          )}
+                        >
+                          Mix
+                        </button>
+                        <button
+                          onClick={() => castWinnerSpell('JUMPSCARE')}
+                          disabled={winnerPowersUsed.JUMPSCARE}
+                          className={clsx(
+                            "flex-1 py-2 text-[10px] font-bold uppercase rounded border transition-all",
+                            winnerPowersUsed.JUMPSCARE
+                              ? "bg-slate-900 text-slate-600 border-slate-800 cursor-not-allowed"
+                              : "bg-red-900/40 hover:bg-red-800 text-red-300 border-red-500/50"
+                          )}
+                        >
+                          Scare
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-2 text-center italic">
+                        1 free use per round.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="bg-slate-800/50 p-4 rounded text-center">
+                    <div className="text-slate-400 text-xs uppercase tracking-wider mb-1">Mistakes</div>
+                    <div className="text-3xl font-horror text-red-500">{targetPlayer.mistakes} / {MAX_MISTAKES}</div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }

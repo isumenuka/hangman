@@ -28,6 +28,8 @@ export interface Player {
   status: 'LOBBY' | 'PLAYING' | 'WON' | 'LOST' | 'SPECTATING';
   mistakes: number; // 0-6
   roundScore: number; // CP earned this round for tournament scoring
+  guessedLetters: string[]; // For Spectator Mode
+  spectatingId?: string; // Who they are watching (if dead/won)
 }
 
 export type NetworkAction =
@@ -39,7 +41,7 @@ export type NetworkAction =
   | { type: 'PLAYER_LEFT'; payload: { playerId: string } }
 
   // Game Control (Host -> All)
-  | { type: 'GAME_START'; payload: { wordData: WordData } }
+  | { type: 'GAME_START'; payload: { wordData: WordData; round: number } }
 
   // Game Progress (Client -> Host -> All)
   | { type: 'UPDATE_MY_STATUS'; payload: { status: Player['status']; mistakes: number } }
