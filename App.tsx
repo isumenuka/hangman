@@ -348,12 +348,11 @@ export default function App() {
     if (status !== GameStatus.IDLE) {
       nextRound = round + 1;
       setRound(nextRound);
+      // Don't set IDLE here to prevent Scene unmounting/flashing Lobby
     } else {
-      // If IDLE (first game?), default 1 or keep?
-      // If we just loaded, round is 1.
+      setStatus(GameStatus.IDLE);
     }
 
-    setStatus(GameStatus.IDLE);
     setUnlockedHints(1); // Reset hints on new game
 
     try {
