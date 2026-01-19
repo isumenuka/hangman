@@ -362,7 +362,7 @@ export default function App() {
       // Track used words to prevent repetition in this session
       setUsedWords(prev => {
         const newHistory = [...prev, data.word];
-        return newHistory.slice(-10); // Keep last 10
+        return newHistory.slice(-200); // Keep last 200
       });
 
       // Use AI hints if available, otherwise fallback to generated ones (safety)
