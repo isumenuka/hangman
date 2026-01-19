@@ -35,7 +35,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose }) => {
                             <Skull className="text-slate-500" size={20} /> Objective
                         </h3>
                         <p className="leading-relaxed text-lg">
-                            Guess the hidden word. <span className="text-red-400 font-bold">6 mistakes = Game Over.</span>
+                            Guess the hidden word. <span className="text-red-400 font-bold">5 mistakes = Game Over.</span>
                         </p>
                     </section>
 
@@ -89,7 +89,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose }) => {
                             <div className="p-3 border border-green-500/30 bg-green-900/10 rounded flex flex-col justify-between">
                                 <div className="flex justify-between items-center mb-1">
                                     <span className="font-bold text-green-300">HEAL</span>
-                                    <span className="text-xs font-bold bg-green-900 px-2 py-0.5 rounded text-green-200">20 CP</span>
+                                    <span className="text-xs font-bold bg-green-900 px-2 py-0.5 rounded text-green-200">40 CP</span>
                                 </div>
                                 <p className="text-xs text-slate-400">Removes 1 mistake.</p>
                             </div>
