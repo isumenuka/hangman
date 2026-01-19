@@ -31,7 +31,7 @@ export default function App() {
   const [showRules, setShowRules] = useState(false);
 
   // --- Sabotage State ---
-  const [curseEnergy, setCurseEnergy] = useState(0);
+  const [curseEnergy, setCurseEnergy] = useState(20);
   const [comboCount, setComboCount] = useState(0);
 
   const [activeDebuffs, setActiveDebuffs] = useState<('FOG' | 'SCRAMBLE')[]>([]);
@@ -330,7 +330,7 @@ export default function App() {
       soundManager.playCorrect();
     } else {
       setComboCount(0); // Reset combo on miss
-      setCurseEnergy(prev => Math.max(0, prev - 5)); // Penalty? No, just 0 gain. Actually maybe small penalty makes it harder? checking user request. User didn't specify penalty. I will leave it as no gain but reset combo.
+      // setCurseEnergy(prev => Math.max(0, prev - 5)); // Penalty removed as per request
       soundManager.playWrong();
     }
   }, [status, guessedLetters, wordData]);
@@ -614,7 +614,7 @@ export default function App() {
       // Reset everything and go back to lobby
       setShowGameOver(false);
       setRound(1);
-      setCurseEnergy(0);
+      setCurseEnergy(20);
       setStatus(GameStatus.IDLE);
       setWordData(null);
       setGuessedLetters([]);

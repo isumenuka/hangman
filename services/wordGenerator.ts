@@ -20,7 +20,8 @@ export const generateWord = async (banList: string[] = []): Promise<WordData> =>
       Random Seed: ${randomSeed}
       EXCLUDE THESE WORDS (ALREADY PLAYED): ${banList.join(', ')}
       
-      THEME: Spooky/Cursed English Words (Adjectives, Nouns, Verbs).
+      THEME: Simple, Common English Words for Children (Grade 1 - Grade 5 Level).
+      Examples: PEACOCK, CUPBOARD, TEACHER, SCHOOL, BANANA, WINDOW, DOCTOR.
       
       CRITICAL CONSTRAINTS:
       - Word must be STRICTLY 6 letters or longer.
