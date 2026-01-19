@@ -137,11 +137,10 @@ export const useMultiplayer = (
     setMyId(socketService.socket.id || 'client');
 
     // Send JOIN_REQUEST (Server relays to existing players)
-    // Wait a moment for join to register? No, just emit.
-    // Actually, since we broadcast to "others", the Host will receive this.
+    // MUST include ID so Host knows who it is.
     const action: NetworkAction = {
       type: 'JOIN_REQUEST',
-      payload: { name }
+      payload: { name, senderId: socketService.socket.id } as any
     };
     socketService.emitAction(roomId, action);
   };
@@ -329,25 +328,6 @@ export const useMultiplayer = (
     }
   };
 
-  // Wrapper for Join that includes Sender ID
-  const joinLobbyWithId = (roomId: string, name: string) => {
-    if (!socketService.socket) return;
-    joinLobby(roomId, name);
-    // We need to override the simplistic joinLobby above to include ID
-    // Actually, I put the logic in `joinLobby` but forgot `senderId`.
-    // Let's re-define `joinLobby` here properly to match the usage. - Wait, `joinLobby` is the exported function.
-
-    // Redefining the logic inside the exported function:
-    // See reference above. 
-    // I will rely on the `joinLobby` defined above but I need to patch the payload.
-
-    // Let's patch `joinLobby`'s emit:
-    const action: NetworkAction = {
-      type: 'JOIN_REQUEST',
-      payload: { name, senderId: socketService.socket.id } as any
-    };
-    socketService.emitAction(roomId, action);
-  };
 
   const setSpectating = (targetId: string | null) => {
     // Just update my 'spectatingId' in the roster.
@@ -413,7 +393,7 @@ export const useMultiplayer = (
       }
     },
 
-    joinLobby: joinLobbyWithId,
+    joinLobby,
     startGame,
     updateMyStatus,
     setSpectating,
