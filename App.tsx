@@ -43,6 +43,7 @@ export default function App() {
   const [activeDebuffs, setActiveDebuffs] = useState<('FOG' | 'SCRAMBLE')[]>([]);
   const [scrambleSeed, setScrambleSeed] = useState(0); // Triggers re-shuffle
   const [spellToCast, setSpellToCast] = useState<'FOG' | 'SCRAMBLE' | 'JUMPSCARE' | null>(null); // For targeting mode
+  const [lastSpellCastTime, setLastSpellCastTime] = useState(0); // Cooldown Tracker
   // Spectator State
   const [spectatingTargetId, setSpectatingTargetId] = useState<string | null>(null);
   const [autoNextRoundCountdown, setAutoNextRoundCountdown] = useState<number | null>(null);
@@ -81,6 +82,11 @@ export default function App() {
     setUnlockedHints(1); // Reset hints on new game
     setHasScared(false); // Reset scare usage
     setWinnerPowersUsed({ FOG: false, SCRAMBLE: false, JUMPSCARE: false }); // Reset free powers
+
+    // Cap Carry-Over Energy (Balance Fix)
+    setCurseEnergy(prev => Math.min(prev, 30));
+
+    // Auto-Close Spectator
 
     // Auto-Close Spectator
     setSpectatingTargetId(null);
@@ -407,6 +413,9 @@ export default function App() {
         if (letterCount >= 2) energyGain += 4;
 
         if (energyGain > 0) {
+          // Underdog Bonus (Balance Fix)
+          if (wrongGuesses >= 4) energyGain *= 2;
+
           setCurseEnergy(e => e + energyGain); // Uncapped points
         }
 
@@ -435,7 +444,17 @@ export default function App() {
   };
 
   const onCastSpell = (spell: 'FOG' | 'SCRAMBLE' | 'JUMPSCARE') => {
-    const cost = spell === 'FOG' ? 15 : spell === 'SCRAMBLE' ? 20 : 0;
+    // Cooldown Check (Balance Fix)
+    if (Date.now() - lastSpellCastTime < 10000) {
+      soundManager.playWrong();
+      setGameLog(prev => [{
+        id: Date.now(),
+        content: <span className="text-orange-500 font-bold">SPELL COOLDOWN! (Wait 10s)</span>
+      }, ...prev]);
+      return;
+    }
+
+    const cost = spell === 'FOG' ? 20 : spell === 'SCRAMBLE' ? 20 : 0;
 
     // Check constraints
     if (spell !== 'JUMPSCARE' && curseEnergy < cost) {
@@ -464,7 +483,7 @@ export default function App() {
 
   const handlePlayerSelect = (targetId: string) => {
     if (!spellToCast) return;
-    const cost = spellToCast === 'FOG' ? 15 : spellToCast === 'SCRAMBLE' ? 20 : 0;
+    const cost = spellToCast === 'FOG' ? 20 : spellToCast === 'SCRAMBLE' ? 20 : 0;
 
     // deduct points
     if (spellToCast !== 'JUMPSCARE') {
@@ -474,6 +493,7 @@ export default function App() {
     castSpell(spellToCast, targetId);
     // setCurseEnergy(0); // No longer reset to 0
     setSpellToCast(null); // Exit selection mode
+    setLastSpellCastTime(Date.now()); // Start Cooldown
     soundManager.playWin(); // temporary sound for casting
     soundManager.playWin(); // temporary sound for casting
     if (spellToCast === 'JUMPSCARE') setHasScared(true);
@@ -1113,7 +1133,7 @@ export default function App() {
                       className="bg-purple-900/30 hover:bg-purple-800 disabled:opacity-30 border border-purple-500/50 text-purple-300 text-xs uppercase font-bold px-4 py-3 rounded transition-colors flex flex-col items-center leading-tight min-w-[70px]"
                     >
                       <span>FOG</span>
-                      <span className="text-[10px] opacity-70">15pts</span>
+                      <span className="text-[10px] opacity-70">20pts</span>
                     </button>
                     <button
                       disabled={curseEnergy < 20}

@@ -71,7 +71,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose }) => {
                             <div className="p-3 border border-purple-500/30 bg-purple-900/10 rounded flex flex-col justify-between">
                                 <div className="flex justify-between items-center mb-1">
                                     <span className="font-bold text-purple-300">FOG</span>
-                                    <span className="text-xs font-bold bg-purple-900 px-2 py-0.5 rounded text-purple-200">15 CP</span>
+                                    <span className="text-xs font-bold bg-purple-900 px-2 py-0.5 rounded text-purple-200">20 CP</span>
                                 </div>
                                 <p className="text-xs text-slate-400">Blinds opponent for 5s.</p>
                             </div>
