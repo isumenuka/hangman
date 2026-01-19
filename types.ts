@@ -28,6 +28,7 @@ export interface Player {
   status: 'LOBBY' | 'PLAYING' | 'WON' | 'LOST' | 'SPECTATING';
   mistakes: number; // 0-6
   roundScore: number; // CP earned this round for tournament scoring
+  totalTime: number; // ms taken to win rounds (New Metric)
   guessedLetters: string[]; // For Spectator Mode
   spectatingId?: string; // Who they are watching (if dead/won)
 }
@@ -44,12 +45,13 @@ export type NetworkAction =
   | { type: 'GAME_START'; payload: { wordData: WordData; round: number } }
 
   // Game Progress (Client -> Host -> All)
-  | { type: 'UPDATE_MY_STATUS'; payload: { status: Player['status']; mistakes: number } }
+  | { type: 'UPDATE_MY_STATUS'; payload: { status: Player['status']; mistakes: number; totalTime?: number } }
   | { type: 'GLOBAL_TICK'; payload: { players: Player[] } } // Broadcast of all states
   | { type: 'CAST_SPELL'; payload: { spellId: 'FOG' | 'SCRAMBLE' | 'JUMPSCARE'; casterName: string; targetId: string } }
   | { type: 'SOUL_MEND'; payload: { playerId: string } }
 
   // Legacy (Optional keep for reference, but likely replacing)
+  | { type: 'ROUND_COUNTDOWN'; payload: { count: number | null } }
   | { type: 'RESTART'; payload: null };
 
 export interface MultiplayerState {

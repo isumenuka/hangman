@@ -12,6 +12,12 @@ import { RulesModal } from './components/RulesModal';
 const MAX_MISTAKES = 6;
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
+const JUMPSCARE_VIDEOS = [
+  '/jumpscare/vlipsy-creepy-face-jump-scare-3hEsFXt9.mp4',
+  '/jumpscare/vlipsy-jump-scare-creepy-doll-nwbQ9bDF.mp4',
+  '/jumpscare/vlipsy-winterrowd-jump-scare-IGMSPmB8.mp4'
+];
+
 export default function App() {
   // --- Local Game State ---
   const [wordData, setWordData] = useState<WordData | null>(null);
@@ -56,19 +62,30 @@ export default function App() {
 
   // Round State
   const [round, setRound] = useState(1);
+  const [roundStartTime, setRoundStartTime] = useState<number>(0);
+  const [totalTimeTaken, setTotalTimeTaken] = useState(0); // My Accumulative Time
   const [showGameOver, setShowGameOver] = useState(false);
+  const [showJumpscare, setShowJumpscare] = useState(false);
+  const [currentJumpscareVideo, setCurrentJumpscareVideo] = useState('');
 
   // Callbacks for Network
   const handleGameStart = useCallback((data: WordData, newRound: number) => {
     setWordData(data);
     setGuessedLetters([]);
     setRound(newRound); // Sync Round
+    setRoundStartTime(Date.now()); // Start Timer!
     setStatus(GameStatus.PLAYING);
+    if (newRound === 1) setTotalTimeTaken(0); // Reset time for new tournament
     // setCurseEnergy(0); // KEPT POINTS PERSISTENT (User Request)
     setActiveDebuffs([]);
     setUnlockedHints(1); // Reset hints on new game
     setHasScared(false); // Reset scare usage
     setWinnerPowersUsed({ FOG: false, SCRAMBLE: false, JUMPSCARE: false }); // Reset free powers
+
+    // Auto-Close Spectator
+    setSpectatingTargetId(null);
+    setSpectating(null);
+
     soundManager.playAmbient();
     soundManager.playClick();
 
@@ -83,7 +100,9 @@ export default function App() {
     soundManager.playWrong();
 
     if (spellId === 'JUMPSCARE') {
-      // Jumpscare disabled
+      const randomVideo = JUMPSCARE_VIDEOS[Math.floor(Math.random() * JUMPSCARE_VIDEOS.length)];
+      setCurrentJumpscareVideo(randomVideo);
+      setShowJumpscare(true);
       return;
     }
 
@@ -116,6 +135,10 @@ export default function App() {
     soundManager.playClick();
   }, []);
 
+  const handleCountdown = useCallback((count: number | null) => {
+    setAutoNextRoundCountdown(count);
+  }, []);
+
 
 
   // ... render logic ... 
@@ -123,7 +146,10 @@ export default function App() {
   // (In JSX, replacing the Toast block)
 
 
-  const { initializePeer, joinLobby, startGame, updateMyStatus, castSpell, setSpectating, myId, roomId, players, connectionStatus, amIHost } = useMultiplayer(handleGameStart, handleWorldUpdate, handleSpellReceived, handleSpellLog);
+  // (In JSX, replacing the Toast block)
+
+
+  const { initializePeer, joinLobby, startGame, updateMyStatus, castSpell, setSpectating, broadcastCountdown, myId, roomId, players, connectionStatus, amIHost } = useMultiplayer(handleGameStart, handleWorldUpdate, handleSpellReceived, handleSpellLog, handleCountdown);
 
   // Check if Round 5 is complete (all players won/lost)
   useEffect(() => {
@@ -137,17 +163,26 @@ export default function App() {
       // Auto-Next Round Sequence
       if (autoNextRoundCountdown === null) {
         setAutoNextRoundCountdown(5); // Start 5s timer
+        broadcastCountdown(5);
       } else if (autoNextRoundCountdown > 0) {
-        const timer = setTimeout(() => setAutoNextRoundCountdown(c => (c !== null ? c - 1 : 0)), 1000);
+        const timer = setTimeout(() => {
+          setAutoNextRoundCountdown(c => {
+            const val = c !== null ? c - 1 : 0;
+            broadcastCountdown(val);
+            return val;
+          });
+        }, 1000);
         return () => clearTimeout(timer);
       } else {
         // Timer hit 0
         if (round < 5) {
           handleStartGame(); // Auto next round
           setAutoNextRoundCountdown(null);
+          broadcastCountdown(null);
         } else {
           setShowGameOver(true);
           setAutoNextRoundCountdown(null);
+          broadcastCountdown(null);
         }
       }
     } else {
@@ -175,17 +210,32 @@ export default function App() {
       if (isWon) {
         setStatus(GameStatus.WON);
         soundManager.playWin();
-        updateMyStatus('WON', wrongGuesses);
+
+        // Calculate Time
+        const timeTaken = Date.now() - roundStartTime;
+        const newTotal = totalTimeTaken + timeTaken;
+        setTotalTimeTaken(newTotal);
+
+        updateMyStatus('WON', wrongGuesses, guessedLetters, newTotal);
       } else if (isLost) {
         setStatus(GameStatus.LOST);
         soundManager.playLose();
-        updateMyStatus('LOST', wrongGuesses, guessedLetters);
+        // Failed round adds penalty time? Or just accumulated time until loss? 
+        // User said "lowest time to spend all round to guess curword".
+        // If lost, maybe max time or penalty? For now, let's just count time spent trying.
+        const timeTaken = Date.now() - roundStartTime;
+        const newTotal = totalTimeTaken + timeTaken;
+        // NOTE: If they lost, they technically didn't guess it. 
+        // Maybe add penalty? User didn't specify. Assuming simply time spent.
+        setTotalTimeTaken(newTotal);
+
+        updateMyStatus('LOST', wrongGuesses, guessedLetters, newTotal);
       } else {
-        // Still playing, report mistakes
-        updateMyStatus('PLAYING', wrongGuesses, guessedLetters);
+        // Still playing, report mistakes (and current accumulated time? No need until end)
+        updateMyStatus('PLAYING', wrongGuesses, guessedLetters, totalTimeTaken);
       }
     }
-  }, [guessedLetters, isWon, isLost, status, wrongGuesses]); // Added updateMyStatus to dep might be loop safe if stable
+  }, [guessedLetters, isWon, isLost, status, wrongGuesses]); // Added dependencies safely
 
   // Audio effect for guess
   const prevGuessLength = React.useRef(0);
@@ -219,6 +269,12 @@ export default function App() {
     }
 
     console.log('[Hint System]', { totalLost, totalLives, players: players.map(p => ({ name: p.name, mistakes: p.mistakes })) });
+
+    // Race Condition Guard: If local state is reset (new round) but players list matches old round (stale mistakes),
+    // skip this calculation to prevent false auto-unlocks.
+    if (guessedLetters.length === 0 && totalLost > 0) {
+      return;
+    }
 
     const lossPercent = totalLives > 0 ? (totalLost / totalLives) * 100 : 0;
 
@@ -494,6 +550,30 @@ export default function App() {
     setSpectating(nextTarget.id);
   };
 
+  // Auto-Switch Spectator on Win/Loss
+  useEffect(() => {
+    if (spectatingTargetId && targetPlayer && targetPlayer.status !== 'PLAYING') {
+      // Allow a moment to see the result (Victory/Defeat)
+      const timer = setTimeout(() => {
+        // Re-check validity in case it changed during timeout
+        const currentTarget = players.find(p => p.id === spectatingTargetId);
+        if (!currentTarget || currentTarget.status !== 'PLAYING') {
+          const validTargets = players.filter(p => p.id !== myId && p.status === 'PLAYING');
+          if (validTargets.length > 0) {
+            // Switch to next available
+            setSpectatingTargetId(validTargets[0].id);
+            setSpectating(validTargets[0].id);
+          } else {
+            // No one left, close
+            setSpectatingTargetId(null);
+            setSpectating(null);
+          }
+        }
+      }, 2000); // 2 second delay
+      return () => clearTimeout(timer);
+    }
+  }, [spectatingTargetId, targetPlayer, players, myId]);
+
   const copyToClipboard = () => {
     if (roomId) {
       navigator.clipboard.writeText(roomId);
@@ -688,8 +768,10 @@ export default function App() {
 
   // --- Game Over / Winner Screen (After Round 5) ---
   if (showGameOver && gameMode !== 'SINGLE') {
-    // Calculate leaderboard based on roundScore
-    const sortedPlayers = [...players].sort((a, b) => b.roundScore - a.roundScore);
+    // Calculate leaderboard based on Time (Lowest is Best)
+    // Filter out those with 0 time (if any bug) or treat them as last?
+    // Assuming everyone played.
+    const sortedPlayers = [...players].sort((a, b) => (a.totalTime || 0) - (b.totalTime || 0));
     const top3 = sortedPlayers.slice(0, 3);
 
     const handleNewGame = () => {
@@ -749,10 +831,10 @@ export default function App() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className={clsx("text-3xl font-bold font-horror", colors[index])}>
-                      {player.roundScore || 0}
+                    <div className={clsx("text-2xl font-horror drop-shadow-[0_2px_5px_rgba(0,0,0,0.5)]", colors[index])}>
+                      {((player.totalTime || 0) / 1000).toFixed(2)}s
                     </div>
-                    <div className="text-xs text-slate-500">CP</div>
+                    <div className="text-xs text-slate-500 uppercase tracking-widest font-bold">TOTAL TIME</div>
                   </div>
                 </div>
               );
@@ -803,9 +885,16 @@ export default function App() {
       {/* Mobile: Top 40%, Desktop: Flex Grow (Remaining Space) */}
       <div className="relative w-full h-[40vh] lg:h-full lg:flex-1 bg-black z-0 order-1 shadow-2xl lg:shadow-none">
         {/* JUMPSCARE OVERLAY */}
-        {/* Jumpscare Removed */}
-
-        {/* Jumpscare Removed */}
+        {showJumpscare && (
+          <div className="absolute inset-0 z-[100] bg-black flex items-center justify-center">
+            <video
+              src={currentJumpscareVideo}
+              autoPlay
+              className="w-full h-full object-cover"
+              onEnded={() => setShowJumpscare(false)}
+            />
+          </div>
+        )}
 
         <GameScene isWon={status === GameStatus.WON || (!!targetPlayer && targetPlayer.status === 'WON')} isLost={status === GameStatus.LOST || (!!targetPlayer && targetPlayer.status === 'LOST')} wrongGuesses={displayWrongGuesses} />
 
@@ -823,6 +912,19 @@ export default function App() {
           </div>
         )
         }
+
+        {/* Round Indicator (Top Center) */}
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[20] flex flex-col items-center pointer-events-none select-none">
+          <div className="text-[10px] text-red-500 font-bold tracking-[0.3em] uppercase opacity-80 mb-[-5px]">CURRENT</div>
+          <div className="text-4xl md:text-5xl font-horror text-red-600 tracking-wider drop-shadow-[0_0_15px_rgba(220,38,38,0.8)] animate-pulse">
+            ROUND {round}
+          </div>
+          {mySpectators.length > 0 && (
+            <div className="flex items-center gap-2 text-xs text-red-400 mt-2 animate-pulse bg-black/40 px-3 py-1 rounded-full border border-red-900/30">
+              <span>👁️</span> {mySpectators.length} watching you
+            </div>
+          )}
+        </div>
 
         {/* Persistent Game Log (Top Left of 3D Scene) */}
         <div className="absolute top-4 left-4 z-[10] w-full max-w-md pointer-events-none flex flex-col gap-1">
@@ -864,15 +966,6 @@ export default function App() {
                     <User size={12} /> <span className="uppercase tracking-wider font-bold">{username}</span>
                   </div>
                 )}
-                {mySpectators.length > 0 && (
-                  <div className="flex items-center gap-1 text-[10px] text-red-400 mt-1 animate-pulse">
-                    <span>👁️</span> {mySpectators.length} watching
-                  </div>
-                )}
-                {/* Round Badge */}
-                <div className="bg-red-950/30 border border-red-900/50 px-2 py-0.5 rounded text-[10px] text-red-400 font-bold uppercase tracking-widest mt-1">
-                  ROUND {round}
-                </div>
               </div>
             </div>
             {/* Desktop: Toggle Player List if needed, or just show it inline? Let's show inline at bottom */}

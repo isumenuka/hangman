@@ -21,7 +21,7 @@ export const generateWord = async (banList: string[] = []): Promise<WordData> =>
       EXCLUDE THESE WORDS (ALREADY PLAYED): ${banList.join(', ')}
       
       THEME: Simple, Common English Words for Children (Grade 1 - Grade 5 Level).
-      Examples: PEACOCK, CUPBOARD, TEACHER, SCHOOL, BANANA, WINDOW, DOCTOR.
+      OBJECTIVE: Pick a word that is completely different from previous ones.
       
       CRITICAL CONSTRAINTS:
       - Word must be STRICTLY 6 letters or longer.

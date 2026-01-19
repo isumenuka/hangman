@@ -6,7 +6,8 @@ export const useMultiplayer = (
   onGameStart: (wordData: WordData, round: number) => void,
   onWorldUpdate: (players: Player[]) => void,
   onSpell: (spellId: 'FOG' | 'SCRAMBLE' | 'JUMPSCARE', casterName: string) => void,
-  onSpellLog: (spellId: string, casterName: string, targetName: string) => void
+  onSpellLog: (spellId: string, casterName: string, targetName: string) => void,
+  onCountdown: (count: number | null) => void
 ) => {
   // Local Identity
   const [myId, setMyId] = useState<string | null>(null); // Ideally we use socket.id
@@ -117,6 +118,7 @@ export const useMultiplayer = (
       isHost: true,
       status: 'LOBBY',
       mistakes: 0,
+      totalTime: 0,
       guessedLetters: [],
       roundScore: 0
     };
@@ -159,6 +161,7 @@ export const useMultiplayer = (
         isHost: false,
         status: 'LOBBY',
         mistakes: 0,
+        totalTime: 0,
         guessedLetters: [],
         roundScore: 0
       };
@@ -219,6 +222,7 @@ export const useMultiplayer = (
                 ...p,
                 status: payload.status,
                 mistakes: payload.mistakes,
+                totalTime: payload.totalTime || p.totalTime,
                 guessedLetters: payload.guessedLetters || p.guessedLetters
               };
             }
@@ -257,6 +261,9 @@ export const useMultiplayer = (
         return updated;
       });
     }
+    else if (action.type === 'ROUND_COUNTDOWN') {
+      onCountdown(action.payload.count);
+    }
 
   }, [amIHost, broadcast, onGameStart, onSpell, onSpellLog, onWorldUpdate, resolveName]);
 
@@ -285,13 +292,13 @@ export const useMultiplayer = (
     });
   };
 
-  const updateMyStatus = (status: Player['status'], mistakes: number, guessedLetters: string[]) => {
+  const updateMyStatus = (status: Player['status'], mistakes: number, guessedLetters: string[], totalTime?: number) => {
     if (amIHost) {
       // Host updates self and broadcasts
       setPlayers(prev => {
         const updated = prev.map(p => {
           if (p.id === socketService.socket?.id) { // OR myId
-            return { ...p, status, mistakes, guessedLetters };
+            return { ...p, status, mistakes, guessedLetters, totalTime: totalTime !== undefined ? totalTime : p.totalTime };
           }
           return p;
         });
@@ -304,7 +311,7 @@ export const useMultiplayer = (
       // MUST include ID so Host knows who it is.
       const action: NetworkAction = {
         type: 'UPDATE_MY_STATUS',
-        payload: { status, mistakes, guessedLetters, senderId: socketService.socket?.id } as any
+        payload: { status, mistakes, guessedLetters, totalTime, senderId: socketService.socket?.id } as any
       };
       broadcast(action); // Sends to Host (and others, but Host handles it)
     }
@@ -326,6 +333,12 @@ export const useMultiplayer = (
     if (targetId === socketService.socket?.id) {
       onSpell(spellId, myName);
     }
+  };
+
+  const broadcastCountdown = (count: number | null) => {
+    if (!amIHost) return;
+    const action: NetworkAction = { type: 'ROUND_COUNTDOWN', payload: { count } };
+    broadcast(action);
   };
 
 
@@ -398,6 +411,7 @@ export const useMultiplayer = (
     updateMyStatus,
     setSpectating,
     castSpell,
+    broadcastCountdown,
     myId,
     roomId: currentRoomId,
     players,
