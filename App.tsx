@@ -9,7 +9,7 @@ import { useMultiplayer } from './hooks/useMultiplayer';
 import { PlayerList } from './components/PlayerList';
 import { RulesModal } from './components/RulesModal';
 
-const MAX_MISTAKES = 6;
+const MAX_MISTAKES = 5;
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 const JUMPSCARE_VIDEOS = [
@@ -421,8 +421,8 @@ export default function App() {
   }, [status, guessedLetters, wordData]);
 
   const onSoulMend = () => {
-    if (curseEnergy < 20 || wrongGuesses === 0) return;
-    setCurseEnergy(prev => prev - 20);
+    if (curseEnergy < 40 || wrongGuesses === 0) return;
+    setCurseEnergy(prev => prev - 40);
     // Heal logic: remove 1 wrong guess
     // We need to add a correct letter retroactively? Or just reduce wrongGuesses visually?
     // Actually, we track guessedLetters. To "heal", we remove the last wrong letter.
@@ -1124,12 +1124,12 @@ export default function App() {
                       <span className="text-[10px] opacity-70">20pts</span>
                     </button>
                     <button
-                      disabled={curseEnergy < 20 || wrongGuesses === 0}
+                      disabled={curseEnergy < 40 || wrongGuesses === 0}
                       onClick={onSoulMend}
                       className="bg-green-900/30 hover:bg-green-800 disabled:opacity-30 border border-green-500/50 text-green-300 text-xs uppercase font-bold px-4 py-3 rounded transition-colors flex flex-col items-center leading-tight min-w-[70px]"
                     >
                       <span>HEAL</span>
-                      <span className="text-[10px] opacity-70">20pts</span>
+                      <span className="text-[10px] opacity-70">40pts</span>
                     </button>
                   </div>
                 </div>
