@@ -26,6 +26,7 @@ export interface Player {
   id: string; // Peer ID
   name: string;
   isHost: boolean;
+  isBot?: boolean; // AI Controlled
   status: 'LOBBY' | 'PLAYING' | 'WON' | 'LOST' | 'SPECTATING';
   mistakes: number; // 0-6
   roundScore: number; // CP earned this round for tournament scoring

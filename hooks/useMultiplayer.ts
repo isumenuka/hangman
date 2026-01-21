@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { socketService } from '../services/socketService';
 import { NetworkAction, Player, WordData } from '../types';
+import { getBotAction } from '../services/imposter';
 
 export const useMultiplayer = (
   onGameStart: (wordData: WordData, round: number) => void,
@@ -31,16 +32,6 @@ export const useMultiplayer = (
   }, []);
 
   // --- Broadcast Helper ---
-  // In Socket.IO, we send "action" to server, server broadcasts to room.
-  // We ALSO need to handle the action locally because "broadcast" usually sends to everyone ELSE.
-  // OR we can ask the server to emit to everyone including sender. 
-  // Let's assume server emits to others, so we might need local handling for some things.
-  // BUT the simplest pattern is: Send to Server -> Server Broadcasts to ALL (including sender).
-  // Socket.IO "io.to(room).emit" does that. 
-  // "socket.to(room).emit" sends to everyone EXCEPT sender.
-  // My server implementation: "socket.to(roomId).emit" -> Everyone ELSE.
-  // So: WE MUST APPLY ACTION LOCALLY TOO.
-
   const broadcast = useCallback((action: NetworkAction) => {
     if (currentRoomId) {
       socketService.emitAction(currentRoomId, action);
@@ -96,6 +87,18 @@ export const useMultiplayer = (
       socketService.disconnect();
     }
   }, []); // Run once on mount
+
+  // --- Bot Helper ---
+  const updateBot = useCallback((botId: string, updates: Partial<Player>) => {
+    if (!amIHost) return;
+    setPlayers(prev => {
+      const updated = prev.map(p => p.id === botId ? { ...p, ...updates } : p);
+      const action: NetworkAction = { type: 'GLOBAL_TICK', payload: { players: updated } };
+      broadcast(action);
+      onWorldUpdate(updated);
+      return updated;
+    });
+  }, [amIHost, broadcast, onWorldUpdate]);
 
   // --- Host Logic ---
   const createGame = (name: string) => {
@@ -398,6 +401,8 @@ export const useMultiplayer = (
 
 
     initializePeer: (name: string, asHost: boolean) => {
+      // Connect first if not connected?
+      // Since we auto-connnect on mount, just create/join.
       if (asHost) {
         createGame(name);
       } else {
@@ -405,17 +410,48 @@ export const useMultiplayer = (
         setMyName(name);
       }
     },
-
     joinLobby,
+    createGame,
     startGame,
     updateMyStatus,
-    setSpectating,
     castSpell,
+    setSpectating,
     broadcastCountdown,
-    myId,
-    roomId: currentRoomId,
+
+    updateBot,
+
+    // Bot Capabilities
+    spawnBot: () => {
+      if (!amIHost || !currentRoomId) return;
+      const botName = "Alastor (Bot)";
+      const botId = `bot-${Date.now()}`;
+
+      const botPlayer: Player = {
+        id: botId,
+        name: botName,
+        isHost: false,
+        isBot: true,
+        status: 'LOBBY',
+        mistakes: 0,
+        totalTime: 0,
+        guessedLetters: [],
+        roundScore: 0
+      };
+
+      setPlayers(prev => {
+        const updated = [...prev, botPlayer];
+        const action: NetworkAction = { type: 'PLAYER_UPDATE', payload: { players: updated } };
+        broadcast(action);
+        onWorldUpdate(updated);
+        return updated;
+      });
+    },
+
+    // Exposed State
     players,
-    connectionStatus,
-    amIHost
+    myId,
+    amIHost,
+    currentRoomId,
+    connectionStatus
   };
 };

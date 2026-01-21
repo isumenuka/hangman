@@ -12,6 +12,7 @@ import { Auth } from './components/Auth';
 import { GlobalLeaderboard } from './components/GlobalLeaderboard';
 import { updateGameStats, supabase } from './utils/supabase';
 import { consultGameMaster } from './services/gameMaster';
+import { getBotAction } from './services/imposter';
 
 const MAX_MISTAKES = 5;
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
@@ -125,6 +126,7 @@ export default function App() {
   }, [guessedLetters.length, status]);
 
 
+
   // Callbacks for Network
   const handleGameStart = useCallback((data: WordData, newRound: number) => {
     setWordData(data);
@@ -214,7 +216,66 @@ export default function App() {
   // (In JSX, replacing the Toast block)
 
 
-  const { initializePeer, joinLobby, startGame, updateMyStatus, castSpell, setSpectating, broadcastCountdown, myId, roomId, players, connectionStatus, amIHost } = useMultiplayer(handleGameStart, handleWorldUpdate, handleSpellReceived, handleSpellLog, handleCountdown);
+  const { initializePeer, joinLobby, startGame, updateMyStatus, castSpell, setSpectating, broadcastCountdown, spawnBot, updateBot, myId, currentRoomId: roomId, players, connectionStatus, amIHost } = useMultiplayer(handleGameStart, handleWorldUpdate, handleSpellReceived, handleSpellLog, handleCountdown);
+  console.log('DEBUG: useMultiplayer result:', { /* spawnBot, updateBot, */ roomId, myId });
+
+  // --- Bot Control Loop ---
+  useEffect(() => {
+    if (!amIHost || status !== GameStatus.PLAYING || !wordData) return;
+
+    const botInterval = setInterval(async () => {
+      // Find active bots
+      const activeBots = players.filter(p => p.isBot && p.status === 'PLAYING');
+      if (activeBots.length === 0) return;
+
+      // Pick a random bot to act (to avoid spamming if multiple)
+      const bot = activeBots[Math.floor(Math.random() * activeBots.length)];
+
+      try {
+        const action = await getBotAction({
+          botName: bot.name,
+          wordLength: wordData.word.length,
+          guessedLetters: bot.guessedLetters,
+          chatHistory: [], // Chat not implemented yet
+          gameState: 'PLAYING',
+          difficulty: wordData.difficulty
+        });
+
+        if (action.type === 'GUESS') {
+          const letter = action.content;
+          if (bot.guessedLetters.includes(letter)) return; // Already guessed
+
+          const isCorrect = wordData.word.includes(letter);
+          const newGuessed = [...bot.guessedLetters, letter];
+          const newMistakes = isCorrect ? bot.mistakes : bot.mistakes + 1;
+          const newStatus = newMistakes >= MAX_MISTAKES ? 'LOST' : (wordData.word.split('').every(c => newGuessed.includes(c) || c === ' ') ? 'WON' : 'PLAYING');
+
+          // Update Bot State
+          updateBot(bot.id, {
+            guessedLetters: newGuessed,
+            mistakes: newMistakes,
+            status: newStatus
+          });
+
+          // Log it
+          if (isCorrect) {
+            setGameLog(prev => [{ id: Date.now(), content: <span className="text-green-400">{bot.name} guessed {letter} (CORRECT)</span> }, ...prev]);
+          } else {
+            setGameLog(prev => [{ id: Date.now(), content: <span className="text-red-400">{bot.name} guessed {letter} (WRONG)</span> }, ...prev]);
+          }
+        }
+        else if (action.type === 'CHAT') {
+          setGameLog(prev => [{ id: Date.now(), content: <span className="text-blue-400 italic">{bot.name}: "{action.content}"</span> }, ...prev]);
+        }
+
+      } catch (e) {
+        console.error("Bot Error", e);
+      }
+
+    }, 3000 + Math.random() * 4000); // Act every 3-7 seconds
+
+    return () => clearInterval(botInterval);
+  }, [amIHost, status, wordData, players]); // Re-run if players change (updateBot will trigger re-render)
 
   // Check if Round 5 is complete (all players won/lost)
   useEffect(() => {
@@ -1139,8 +1200,18 @@ export default function App() {
             </div>
             {/* Desktop: Toggle Player List if needed, or just show it inline? Let's show inline at bottom */}
             {gameMode !== 'SINGLE' && (
-              <div className="bg-slate-800 px-2 py-1 rounded text-xs text-slate-300 flex items-center gap-1">
-                <Users size={12} /> {players.length}
+              <div className="flex items-center gap-2">
+                <div className="bg-slate-800 px-2 py-1 rounded text-xs text-slate-300 flex items-center gap-1">
+                  <Users size={12} /> {players.length}
+                </div>
+                {amIHost && status === GameStatus.IDLE && (
+                  <button
+                    onClick={spawnBot}
+                    className="px-2 py-1 bg-purple-900/50 hover:bg-purple-800 border border-purple-500/30 rounded text-[10px] text-purple-200 uppercase font-bold tracking-wider transition-colors"
+                  >
+                    + ADD BOT
+                  </button>
+                )}
               </div>
             )}
             <button
