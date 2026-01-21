@@ -36,6 +36,8 @@ export const generateWord = async (banList: string[] = []): Promise<WordData> =>
       - Word must be SINGLE WORD (or joined with underscores), NO SPACES.
       - Word must be a SINGULAR NOUN (Absolute NO PLURALS like 'Cats', 'Houses', 'Trees').
       - Generated "hints" array must contain EXACTLY 5 simple English sentences progressively getting easier.
+      - Generated "visual_hint_css" must be a VALID CSS string for a 'style' attribute (e.g. "background: linear-gradient(...);").
+      - The CSS should be Abstract, Dark Surrealism style, representing the "Vibe" of the word without showing it directly.
       
       Output JSON only.
     `;
@@ -49,9 +51,10 @@ export const generateWord = async (banList: string[] = []): Promise<WordData> =>
         hints: {
           type: SchemaType.ARRAY,
           items: { type: SchemaType.STRING }
-        }
+        },
+        visual_hint_css: { type: SchemaType.STRING }
       },
-      required: ["word", "hint", "difficulty", "hints"]
+      required: ["word", "hint", "difficulty", "hints", "visual_hint_css"]
     };
 
     let attempts = 0;

@@ -2,6 +2,7 @@ export interface WordData {
   word: string;
   hint: string; // Legacy/Primary hint
   hints?: string[]; // Progressive hints (5 total)
+  visual_hint_css?: string; // Abstract CSS art hint
   difficulty: 'Easy' | 'Medium' | 'Hard';
 }
 
