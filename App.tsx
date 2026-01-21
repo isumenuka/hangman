@@ -13,11 +13,13 @@ import { GlobalLeaderboard } from './components/GlobalLeaderboard';
 import { updateGameStats, supabase } from './utils/supabase';
 import { consultGameMaster } from './services/gameMaster';
 import { getBotAction } from './services/imposter';
+import ShaderBackground from './components/ShaderBackground';
 
 const MAX_MISTAKES = 5;
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 const JUMPSCARE_VIDEOS = [
+
   '/jumpscare/vlipsy-creepy-face-jump-scare-3hEsFXt9.mp4',
   '/jumpscare/vlipsy-jump-scare-creepy-doll-nwbQ9bDF.mp4',
   '/jumpscare/vlipsy-winterrowd-jump-scare-IGMSPmB8.mp4'
@@ -846,10 +848,16 @@ export default function App() {
   }
 
   // Lobby Name Setup
+
   if (gameMode === 'LOBBY_SETUP') {
     return (
       <div className="relative w-full h-screen bg-black flex items-center justify-center text-slate-100">
-        <div className="p-8 bg-slate-900 rounded border border-slate-700 w-full max-w-md">
+        {/* Background Shader */}
+        <ShaderBackground
+          active={true}
+          mood="mysterious"
+        />
+        <div className="p-8 bg-slate-900/80 rounded border border-slate-700 w-full max-w-md backdrop-blur-sm z-10">
           <button onClick={() => setGameMode('MENU')} className="text-slate-500 mb-4 hover:text-white">Back</button>
           <h2 className="text-2xl font-horror mb-4 text-red-500">IDENTIFY YOURSOUL</h2>
           <input
@@ -886,10 +894,16 @@ export default function App() {
     );
   }
 
+
   // Active Lobby / Waiting Room
   if ((gameMode === 'LOBBY_HOST' || gameMode === 'LOBBY_JOIN') && status === GameStatus.IDLE) {
     return (
-      <div className="w-full h-screen bg-slate-950 flex flex-col md:flex-row gap-4 p-4 overflow-y-auto">
+      <div className="w-full h-screen bg-slate-950/50 flex flex-col md:flex-row gap-4 p-4 overflow-y-auto">
+        {/* Background Shader */}
+        <ShaderBackground
+          active={true}
+          mood="anticipation"
+        />
         {/* Left: Setup Panel */}
         <div className="flex-1 flex flex-col items-center justify-center bg-black/50 border border-slate-800 rounded relative min-h-[300px]">
           <button onClick={() => setGameMode('MENU')} className="absolute top-4 left-4 text-slate-500 hover:text-white">Exit</button>
