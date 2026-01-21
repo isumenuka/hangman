@@ -11,6 +11,7 @@ import { RulesModal } from './components/RulesModal';
 import { Auth } from './components/Auth';
 import { GlobalLeaderboard } from './components/GlobalLeaderboard';
 import { updateGameStats, supabase } from './utils/supabase';
+import { consultGameMaster } from './services/gameMaster';
 
 const MAX_MISTAKES = 5;
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
@@ -30,6 +31,11 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [lobbyError, setLobbyError] = useState<string | null>(null);
   const [username, setUsername] = useState('');
+
+  // --- GM State ---
+  const [gmNarrative, setGmNarrative] = useState<string | null>(null);
+  const [activeRule, setActiveRule] = useState<'NONE' | 'VOWELS_DISABLED' | 'Invert_Controls'>('NONE');
+  const [atmosphere, setAtmosphere] = useState<'NONE' | 'RED_FOG' | 'GLITCH' | 'DARKNESS'>('NONE');
 
 
 
@@ -73,6 +79,50 @@ export default function App() {
   const [showGameOver, setShowGameOver] = useState(false);
   const [showJumpscare, setShowJumpscare] = useState(false);
   const [currentJumpscareVideo, setCurrentJumpscareVideo] = useState('');
+
+  // --- GM Logic ---
+  const triggerGM = async () => {
+    if (!wordData || !amIHost) return; // Only Host triggers GM in multiplayer
+    try {
+      const response = await consultGameMaster({
+        word: wordData.word,
+        guessedLetters,
+        wrongGuesses,
+        playerNames: players.map(p => p.name),
+        recentAction: "Game Update",
+        streak: comboCount
+      });
+
+      console.log("GM Spoke:", response);
+      if (response.narrative) {
+        setGmNarrative(response.narrative);
+        // Broadcast narrative? For now local, but ideally host broadcasts narrative.
+        // Since we are in Hackathon mode, local effect for Host or Sync is fine.
+        // Let's keep it simple: Host sees it, maybe we sync later.
+        setTimeout(() => setGmNarrative(null), 8000);
+      }
+
+      if (response.rule_change && response.rule_change !== 'NONE') {
+        setActiveRule(response.rule_change as any);
+        setTimeout(() => setActiveRule('NONE'), 30000); // 30s rule duration
+      }
+
+      if (response.atmosphere && response.atmosphere !== 'NONE') {
+        setAtmosphere(response.atmosphere as any);
+      }
+
+    } catch (e) {
+      console.error("GM Failed", e);
+    }
+  };
+
+  // Trigger GM on specific events (e.g. every 3 guesses)
+  useEffect(() => {
+    if (status === GameStatus.PLAYING && guessedLetters.length > 0 && guessedLetters.length % 3 === 0) {
+      triggerGM();
+    }
+  }, [guessedLetters.length, status]);
+
 
   // Callbacks for Network
   const handleGameStart = useCallback((data: WordData, newRound: number) => {
@@ -435,6 +485,13 @@ export default function App() {
 
   // Sabotage Logic: Combo System (Consolidated)
   const handleGuess = useCallback((letter: string) => {
+    // GM RULE ENFORCEMENT
+    if (activeRule === 'VOWELS_DISABLED' && "AEIOU".includes(letter)) {
+      soundManager.playWrong();
+      // Optional: Shake effect or visual feedback
+      return;
+    }
+
     if (status !== GameStatus.PLAYING || guessedLetters.includes(letter)) return;
     setGuessedLetters(prev => [...prev, letter]);
 
@@ -1535,6 +1592,34 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* --- GM NARRATIVE OVERLAY --- */}
+      {gmNarrative && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 w-full max-w-2xl px-4 pointer-events-none">
+          <div className="bg-black/90 border-2 border-red-900/50 p-6 rounded-lg text-center shadow-2xl shadow-red-900/40 animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="text-red-500 font-bold tracking-[0.3em] text-xs uppercase mb-2">THE SPIRIT WHISPERS</div>
+            <p className="text-xl md:text-2xl text-slate-100 font-serif italic leading-relaxed">"{gmNarrative}"</p>
+          </div>
+        </div>
+      )}
+
+      {/* --- GM RULE WARNING --- */}
+      {activeRule !== 'NONE' && (
+        <div className="fixed bottom-32 left-1/2 -translate-x-1/2 z-40 bg-red-950/80 border border-red-500 px-6 py-2 rounded-full animate-pulse">
+          <span className="text-red-200 font-bold uppercase tracking-widest text-sm flex items-center gap-2">
+            <Skull size={16} /> CURSE ACTIVE: {activeRule.replace('_', ' ')}
+          </span>
+        </div>
+      )}
+
+      {/* --- ATMOSPHERE EFFECTS --- */}
+      <div className={clsx(
+        "fixed inset-0 pointer-events-none z-0 transition-all duration-1000",
+        atmosphere === 'RED_FOG' && "bg-red-900/10 backdrop-blur-[1px]",
+        atmosphere === 'DARKNESS' && "bg-black/60",
+        atmosphere === 'GLITCH' && "invert opacity-10"
+      )} />
+
     </div>
   );
 }

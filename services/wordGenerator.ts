@@ -1,16 +1,20 @@
 import { WordData } from "../types";
-import { Mistral } from "@mistralai/mistralai";
+import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 
-const API_KEY = import.meta.env.VITE_MISTRAL_API_KEY;
+// API Key provided by user
+const API_KEY = "AIzaSyDoEXwejPFRzS7xFRbXM_pstd72Y9EOSR0";
 
 export const generateWord = async (banList: string[] = []): Promise<WordData> => {
   if (!API_KEY) {
-    console.warn("Mistral Service: No API Key found.");
+    console.warn("Gemini Service: No API Key found.");
     throw new Error("API_KEY_MISSING");
   }
 
   try {
-    const mistral = new Mistral({ apiKey: API_KEY });
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.0-flash-exp"
+    });
 
     // Add randomness to prompt effectively breaking cache
     const randomSeed = Math.random().toString(36).substring(7);
@@ -33,38 +37,42 @@ export const generateWord = async (banList: string[] = []): Promise<WordData> =>
       - Word must be a SINGULAR NOUN (Absolute NO PLURALS like 'Cats', 'Houses', 'Trees').
       - Generated "hints" array must contain EXACTLY 5 simple English sentences progressively getting easier.
       
-      Format (JSON ONLY, no markdown):
-      {
-        "word": "STRING",
-        "hint": "Cryptic main clue", 
-        "difficulty": "Easy" | "Medium" | "Hard",
-        "hints": ["Hint 1", "Hint 2", "Hint 3", "Hint 4", "Hint 5"] 
-      }
+      Output JSON only.
     `;
+
+    const schema = {
+      type: SchemaType.OBJECT,
+      properties: {
+        word: { type: SchemaType.STRING },
+        hint: { type: SchemaType.STRING },
+        difficulty: { type: SchemaType.STRING, enum: ["Easy", "Medium", "Hard"] },
+        hints: {
+          type: SchemaType.ARRAY,
+          items: { type: SchemaType.STRING }
+        }
+      },
+      required: ["word", "hint", "difficulty", "hints"]
+    };
 
     let attempts = 0;
     const MAX_ATTEMPTS = 3;
 
     while (attempts < MAX_ATTEMPTS) {
       attempts++;
-      const response = await mistral.chat.complete({
-        model: "mistral-small-latest",
-        messages: [
-          {
-            content: prompt,
-            role: "user",
-          },
-        ],
-        responseFormat: {
-          type: "json_object"
-        },
-        temperature: 0.9 + (attempts * 0.05), // Increase randomness on retry
+
+      const result = await model.generateContent({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: schema,
+          temperature: 0.9 + (attempts * 0.05), // Increase randomness on retry
+        }
       });
 
-      const text = response.choices?.[0]?.message?.content;
-      if (!text) throw new Error("No response from AI");
+      const responseText = result.response.text();
+      if (!responseText) throw new Error("No response from AI");
 
-      const data = JSON.parse(text);
+      const data = JSON.parse(responseText);
 
       const candidateWord = data.word.toUpperCase().replace(/\s+/g, '_');
 
@@ -74,7 +82,7 @@ export const generateWord = async (banList: string[] = []): Promise<WordData> =>
         continue;
       }
 
-      console.log("Mistral Generated:", data);
+      console.log("Gemini Generated:", data);
 
       return {
         word: candidateWord,
@@ -86,12 +94,9 @@ export const generateWord = async (banList: string[] = []): Promise<WordData> =>
 
     throw new Error("FAILED_TO_GENERATE_UNIQUE_WORD");
 
-
-
   } catch (error: any) {
-    console.error("Mistral Service Error:", error);
-    // Check for rate limit errors
-    if (error.message?.includes('429') || error.statusCode === 429) {
+    console.error("Gemini Service Error:", error);
+    if (error.message?.includes('429') || error.status === 429) {
       throw new Error("API_LIMIT_EXCEEDED");
     }
     throw error;

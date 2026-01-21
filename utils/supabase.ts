@@ -4,11 +4,37 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
 
+let client;
+
 if (!supabaseUrl || !supabaseKey) {
-    console.warn('Supabase URL or Key missing. Stats will not be saved.');
+    console.warn('Supabase URL or Key missing. Using MOCK client. Auth and Stats will be disabled.');
+    // Mock Client to prevent crash
+    client = {
+        auth: {
+            onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => { } } } }),
+            getUser: async () => ({ data: { user: null } }),
+            getSession: async () => ({ data: { session: null } }),
+            signInWithPassword: async () => ({ error: { message: "Auth disabled in mock mode" } }),
+            signUp: async () => ({ error: { message: "Auth disabled in mock mode" } }),
+            signOut: async () => ({ error: null })
+        },
+        from: () => ({
+            select: () => ({
+                eq: () => ({
+                    single: async () => ({ data: null, error: { code: 'PGRST116' } })
+                }),
+                order: () => ({
+                    limit: async () => ({ data: [], error: null })
+                })
+            })
+        }),
+        rpc: async () => ({ error: null })
+    };
+} else {
+    client = createClient(supabaseUrl, supabaseKey);
 }
 
-export const supabase = createClient(supabaseUrl || '', supabaseKey || '');
+export const supabase = client;
 
 // --- Types ---
 export interface PlayerStats {

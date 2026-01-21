@@ -60,3 +60,12 @@ export interface MultiplayerState {
   otherPlayers: Player[]; // List of everyone else
   connectionStatus: 'DISCONNECTED' | 'CONNECTING' | 'CONNECTED';
 }
+
+// --- Dungeon Master Types ---
+export interface GameMasterResponse {
+  narrative: string;
+  attitude: 'Sadistic' | 'Helpful' | 'Cryptic' | 'Bored';
+  rule_change?: 'NONE' | 'VOWELS_DISABLED' | 'Invert_Controls' | 'Double_Damage';
+  atmosphere?: 'NONE' | 'RED_FOG' | 'GLITCH' | 'DARKNESS';
+}
+
