@@ -51,6 +51,7 @@ export type NetworkAction =
   | { type: 'GLOBAL_TICK'; payload: { players: Player[] } } // Broadcast of all states
   | { type: 'CAST_SPELL'; payload: { spellId: 'FOG' | 'SCRAMBLE' | 'JUMPSCARE'; casterName: string; targetId: string } }
   | { type: 'SOUL_MEND'; payload: { playerId: string } }
+  | { type: 'CHAT_MESSAGE'; payload: { sender: string; text: string; isSystem?: boolean } }
 
   // Legacy (Optional keep for reference, but likely replacing)
   | { type: 'ROUND_COUNTDOWN'; payload: { count: number | null } }

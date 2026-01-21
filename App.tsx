@@ -13,6 +13,7 @@ import { GlobalLeaderboard } from './components/GlobalLeaderboard';
 import { updateGameStats, supabase } from './utils/supabase';
 import { consultGameMaster } from './services/gameMaster';
 import { getBotAction } from './services/imposter';
+import { getOracleHint, generateRoast, generateGlitchText } from './services/powers';
 import ShaderBackground from './components/ShaderBackground';
 
 const MAX_MISTAKES = 5;
@@ -50,7 +51,7 @@ export default function App() {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
 
   // --- Sabotage State ---
-  const [curseEnergy, setCurseEnergy] = useState(20);
+  const [curseEnergy, setCurseEnergy] = useState(100);
   const [comboCount, setComboCount] = useState(0);
 
   const [activeDebuffs, setActiveDebuffs] = useState<('FOG' | 'SCRAMBLE')[]>([]);
@@ -208,6 +209,17 @@ export default function App() {
     setAutoNextRoundCountdown(count);
   }, []);
 
+  const handleMessage = useCallback((sender: string, text: string, isSystem?: boolean) => {
+    const content = isSystem ? (
+      <span className="text-red-500 font-bold uppercase tracking-widest animate-pulse border-l-2 border-red-500 pl-2 block my-1 shadow-[0_0_10px_rgba(220,38,38,0.5)]">{text}</span>
+    ) : (
+      <span className="text-blue-300">
+        <span className="font-bold text-blue-500">{sender}:</span> {text}
+      </span>
+    );
+    setGameLog(prev => [{ id: Date.now(), content }, ...prev]);
+  }, []);
+
 
 
   // ... render logic ... 
@@ -218,8 +230,49 @@ export default function App() {
   // (In JSX, replacing the Toast block)
 
 
-  const { initializePeer, joinLobby, startGame, updateMyStatus, castSpell, setSpectating, broadcastCountdown, spawnBot, updateBot, myId, currentRoomId: roomId, players, connectionStatus, amIHost } = useMultiplayer(handleGameStart, handleWorldUpdate, handleSpellReceived, handleSpellLog, handleCountdown);
+
+  const { initializePeer, joinLobby, startGame, updateMyStatus, castSpell, setSpectating, broadcastCountdown, spawnBot, updateBot, sendMessage, myId, currentRoomId: roomId, players, connectionStatus, amIHost } = useMultiplayer(handleGameStart, handleWorldUpdate, handleSpellReceived, handleSpellLog, handleMessage, handleCountdown);
   console.log('DEBUG: useMultiplayer result:', { /* spawnBot, updateBot, */ roomId, myId });
+
+  // --- Gemini Power Handlers ---
+  const handleOracle = async () => {
+    if (!wordData || curseEnergy < 15) return;
+    setCurseEnergy(prev => prev - 15);
+    setGameLog(prev => [{ id: Date.now(), content: <span className="text-purple-400 italic">Consulting the Oracle...</span> }, ...prev]);
+
+    // Using a timeout to not block UI if heavy? No, async is fine.
+    try {
+      const hint = await getOracleHint(wordData.word);
+      // Oracle is personal or public? Use sendMessage for public.
+      // Let's make it public fun.
+      sendMessage(`THE ORACLE SPEAKS:\n${hint}`, false);
+      // Actually false -> standard chat style, but maybe I want special formatting?
+      // Let's pass "System" true for big impact.
+      // sendMessage(`🔮 ORACLE: ${hint}`, true);
+    } catch (e) { console.error(e); }
+  };
+
+  const handleRoast = async () => {
+    if (curseEnergy < 10) return;
+    setCurseEnergy(prev => prev - 10);
+    const target = players.find(p => !p.isHost && p.status === 'PLAYING') || players[Math.floor(Math.random() * players.length)];
+    if (!target) return;
+
+    try {
+      const roast = await generateRoast(target.name, target.mistakes, target.roundScore);
+      sendMessage(`🔥 ${roast}`, true);
+    } catch (e) { console.error(e); }
+  };
+
+  const handleGlitch = async () => {
+    if (curseEnergy < 25) return;
+    setCurseEnergy(prev => prev - 25);
+
+    try {
+      const glitch = await generateGlitchText();
+      sendMessage(`👾 SYSTEM_ERR: ${glitch}`, true);
+    } catch (e) { console.error(e); }
+  };
 
   // --- Bot Control Loop ---
   useEffect(() => {
@@ -1392,6 +1445,7 @@ export default function App() {
                       <span>MIX</span>
                       <span className="text-[10px] opacity-70">20pts</span>
                     </button>
+
                     <button
                       disabled={curseEnergy < 40 || wrongGuesses === 0}
                       onClick={onSoulMend}
@@ -1401,6 +1455,37 @@ export default function App() {
                       <span className="text-[10px] opacity-70">40pts</span>
                     </button>
                   </div>
+                </div>
+
+                {/* Gemini Powers Row */}
+                <div className="flex gap-2">
+                  <button
+                    disabled={curseEnergy < 15}
+                    onClick={handleOracle}
+                    className="flex-1 bg-cyan-900/30 hover:bg-cyan-800 disabled:opacity-30 border border-cyan-500/50 text-cyan-300 text-xs uppercase font-bold py-2 rounded transition-colors flex items-center justify-center gap-2"
+                    title="Ask the AI Oracle for a hint"
+                  >
+                    <span>🔮 ORACLE</span>
+                    <span className="text-[10px] opacity-70">15pts</span>
+                  </button>
+                  <button
+                    disabled={curseEnergy < 10}
+                    onClick={handleRoast}
+                    className="flex-1 bg-red-900/30 hover:bg-red-800 disabled:opacity-30 border border-red-500/50 text-red-300 text-xs uppercase font-bold py-2 rounded transition-colors flex items-center justify-center gap-2"
+                    title="AI Roast an opponent"
+                  >
+                    <span>🔥 ROAST</span>
+                    <span className="text-[10px] opacity-70">10pts</span>
+                  </button>
+                  <button
+                    disabled={curseEnergy < 25}
+                    onClick={handleGlitch}
+                    className="flex-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 border border-slate-500 text-slate-300 text-xs uppercase font-bold py-2 rounded transition-colors flex items-center justify-center gap-2"
+                    title="Glitch the reality (Narrative Chaos)"
+                  >
+                    <span>👾 GLITCH</span>
+                    <span className="text-[10px] opacity-70">25pts</span>
+                  </button>
                 </div>
 
                 {/* Scare Button - Separate Row Below */}
@@ -1449,295 +1534,311 @@ export default function App() {
 
           {/* Restart Button - HIDDEN for Host in Multiplayer if not everyone finished (controlled by auto-logic) */}
           {/* Actually, Host can force start if they really want? But user asked "Wait for all". Let's hide it or disable it. */}
-          {(gameMode === 'SINGLE' || (amIHost && players.every(p => p.status !== 'PLAYING'))) && status !== GameStatus.IDLE && status !== GameStatus.PLAYING && (
-            <button
-              onClick={handleStartGame}
-              // Disable if countdown is running to prevent double click? Or let it override?
-              className="mt-6 w-full py-3 bg-red-900 hover:bg-red-800 text-white font-bold rounded flex items-center justify-center gap-2 transition-colors border-t border-red-700"
-            >
-              <RotateCcw size={18} /> {status === GameStatus.WON || status === GameStatus.LOST ? `START ROUND ${round + 1}` : 'RESTART RITUAL'}
-            </button>
-          )}
+          {
+            (gameMode === 'SINGLE' || (amIHost && players.every(p => p.status !== 'PLAYING'))) && status !== GameStatus.IDLE && status !== GameStatus.PLAYING && (
+              <button
+                onClick={handleStartGame}
+                // Disable if countdown is running to prevent double click? Or let it override?
+                className="mt-6 w-full py-3 bg-red-900 hover:bg-red-800 text-white font-bold rounded flex items-center justify-center gap-2 transition-colors border-t border-red-700"
+              >
+                <RotateCcw size={18} /> {status === GameStatus.WON || status === GameStatus.LOST ? `START ROUND ${round + 1}` : 'RESTART RITUAL'}
+              </button>
+            )
+          }
 
 
           {/* Spectator Controls (If dead/won) */}
-          {(status === GameStatus.WON || status === GameStatus.LOST) && !spectatingTargetId && gameMode !== 'SINGLE' && (
-            <div className="mt-4 p-4 bg-slate-900/80 border border-slate-700 rounded">
-              <h3 className="text-slate-400 text-xs uppercase font-bold mb-2">Spectate Players</h3>
-              <div className="flex flex-wrap gap-2">
-                {players.filter(p => p.id !== myId && p.status === 'PLAYING').map(p => (
-                  <button
-                    key={p.id}
-                    onClick={() => { setSpectatingTargetId(p.id); setSpectating(p.id); }}
-                    className="text-xs bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded flex items-center gap-2 border border-slate-600"
-                  >
-                    <User size={12} /> {p.name}
-                  </button>
-                ))}
-                {players.filter(p => p.id !== myId && p.status === 'PLAYING').length === 0 && (
-                  <span className="text-slate-600 text-xs italic">No active players to watch.</span>
-                )}
+          {
+            (status === GameStatus.WON || status === GameStatus.LOST) && !spectatingTargetId && gameMode !== 'SINGLE' && (
+              <div className="mt-4 p-4 bg-slate-900/80 border border-slate-700 rounded">
+                <h3 className="text-slate-400 text-xs uppercase font-bold mb-2">Spectate Players</h3>
+                <div className="flex flex-wrap gap-2">
+                  {players.filter(p => p.id !== myId && p.status === 'PLAYING').map(p => (
+                    <button
+                      key={p.id}
+                      onClick={() => { setSpectatingTargetId(p.id); setSpectating(p.id); }}
+                      className="text-xs bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded flex items-center gap-2 border border-slate-600"
+                    >
+                      <User size={12} /> {p.name}
+                    </button>
+                  ))}
+                  {players.filter(p => p.id !== myId && p.status === 'PLAYING').length === 0 && (
+                    <span className="text-slate-600 text-xs italic">No active players to watch.</span>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )
+          }
 
-          {gameMode !== 'SINGLE' && !amIHost && status !== GameStatus.IDLE && status !== GameStatus.PLAYING && (
-            <div className="mt-6 text-center text-slate-500 text-xs uppercase tracking-widest animate-pulse">
-              {autoNextRoundCountdown !== null ? `Starting Round ${round + 1} in ${autoNextRoundCountdown}...` : "Waiting for all players..."}
-            </div>
-          )}
+          {
+            gameMode !== 'SINGLE' && !amIHost && status !== GameStatus.IDLE && status !== GameStatus.PLAYING && (
+              <div className="mt-6 text-center text-slate-500 text-xs uppercase tracking-widest animate-pulse">
+                {autoNextRoundCountdown !== null ? `Starting Round ${round + 1} in ${autoNextRoundCountdown}...` : "Waiting for all players..."}
+              </div>
+            )
+          }
 
           {/* Player List (Inline for Desktop Sidebar) */}
           {/* We can put it in a collapsable or just below if there's space. Let's make it a toggle or separate tab? 
                  Actually, just putting it at the bottom is safe since it scroll. */}
-          {gameMode !== 'SINGLE' && (
-            <div className="mt-8 border-t border-slate-800 pt-4">
-              <PlayerList
-                players={players}
-                myId={myId}
-                onPlayerSelect={handlePlayerSelect} // Re-enabled
-                selectionMode={!!spellToCast}
-              />
-            </div>
-          )}
+          {
+            gameMode !== 'SINGLE' && (
+              <div className="mt-8 border-t border-slate-800 pt-4">
+                <PlayerList
+                  players={players}
+                  myId={myId}
+                  onPlayerSelect={handlePlayerSelect} // Re-enabled
+                  selectionMode={!!spellToCast}
+                />
+              </div>
+            )
+          }
 
-        </div>
+        </div >
 
         {/* Persistent Game Log (Top Left) */}
 
 
         {/* Target Selection Modal (Dedicated Popup) */}
-        {spellToCast && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-slate-900 border border-red-900 shadow-[0_0_50px_rgba(220,38,38,0.5)] rounded-lg w-full max-w-md p-6 flex flex-col gap-4">
+        {
+          spellToCast && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+              <div className="bg-slate-900 border border-red-900 shadow-[0_0_50px_rgba(220,38,38,0.5)] rounded-lg w-full max-w-md p-6 flex flex-col gap-4">
 
-              <div className="text-center">
-                <h3 className="text-3xl font-horror text-red-600 tracking-wider mb-2">CAST {spellToCast}</h3>
-                <p className="text-slate-400 text-sm">Select a victim to curse...</p>
-              </div>
-
-              <div className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto">
-                {players.filter(p => p.id !== myId).map(p => (
-                  <button
-                    key={p.id}
-                    onClick={() => handlePlayerSelect(p.id)}
-                    disabled={p.status !== 'PLAYING'}
-                    className="bg-black/50 hover:bg-red-900/40 border border-slate-700 hover:border-red-500 p-4 rounded flex items-center justify-between group transition-all"
-                  >
-                    <span className="font-bold text-slate-200 group-hover:text-white flex items-center gap-2">
-                      <User size={16} /> {p.name}
-                    </span>
-                    {p.status !== 'PLAYING' ? (
-                      <span className="text-[10px] text-slate-600 uppercase">Eliminated</span>
-                    ) : (
-                      <span className="text-xs text-red-500 opacity-0 group-hover:opacity-100 uppercase font-bold tracking-widest transition-opacity">
-                        CURSE
-                      </span>
-                    )}
-                  </button>
-                ))}
-                {players.filter(p => p.id !== myId).length === 0 && (
-                  <div className="text-center text-slate-600 italic py-4">No victims available...</div>
-                )}
-              </div>
-
-              <button
-                onClick={() => setSpellToCast(null)}
-                className="mt-2 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-bold transition-colors"
-              >
-                CANCEL RITUAL
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Spectator Window Modal */}
-      {spectatingTargetId && targetPlayer && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-300">
-          <div className="w-full max-w-5xl bg-slate-950 border-2 border-red-600 rounded-lg shadow-2xl shadow-red-900/50 flex flex-col h-[85vh] overflow-hidden">
-
-            {/* Window Header */}
-            <div className="flex items-center justify-between p-2 md:p-4 bg-red-950/30 border-b border-red-900/50 shrink-0">
-              <div className="flex items-center gap-2 md:gap-4 overflow-hidden">
-                <button onClick={() => cycleSpectator(-1)} className="p-2 bg-black/40 hover:bg-red-900/40 rounded text-red-200 transition-colors shrink-0">
-                  <ChevronLeft size={20} />
-                </button>
-                <div className="text-center overflow-hidden">
-                  <div className="text-[10px] md:text-xs text-red-400 font-bold tracking-[0.2em] uppercase truncate">SPECTATING</div>
-                  <div className="text-lg md:text-2xl font-horror text-white tracking-wider truncate max-w-[120px] md:max-w-xs">{targetPlayer.name}</div>
+                <div className="text-center">
+                  <h3 className="text-3xl font-horror text-red-600 tracking-wider mb-2">CAST {spellToCast}</h3>
+                  <p className="text-slate-400 text-sm">Select a victim to curse...</p>
                 </div>
-                <button onClick={() => cycleSpectator(1)} className="p-2 bg-black/40 hover:bg-red-900/40 rounded text-red-200 transition-colors shrink-0">
-                  <ChevronRight size={20} />
-                </button>
-              </div>
 
-              <div className="flex items-center gap-2 md:gap-4 shrink-0">
-                {/* Status Badge */}
-                <div className={clsx(
-                  "px-2 py-1 md:px-3 md:py-1 rounded text-[10px] md:text-xs font-bold uppercase tracking-wider border",
-                  targetPlayer.status === 'WON' ? "bg-green-950 text-green-400 border-green-800" :
-                    targetPlayer.status === 'LOST' ? "bg-red-950 text-red-400 border-red-800" :
-                      "bg-blue-950 text-blue-400 border-blue-800"
-                )}>
-                  {targetPlayer.status}
+                <div className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto">
+                  {players.filter(p => p.id !== myId).map(p => (
+                    <button
+                      key={p.id}
+                      onClick={() => handlePlayerSelect(p.id)}
+                      disabled={p.status !== 'PLAYING'}
+                      className="bg-black/50 hover:bg-red-900/40 border border-slate-700 hover:border-red-500 p-4 rounded flex items-center justify-between group transition-all"
+                    >
+                      <span className="font-bold text-slate-200 group-hover:text-white flex items-center gap-2">
+                        <User size={16} /> {p.name}
+                      </span>
+                      {p.status !== 'PLAYING' ? (
+                        <span className="text-[10px] text-slate-600 uppercase">Eliminated</span>
+                      ) : (
+                        <span className="text-xs text-red-500 opacity-0 group-hover:opacity-100 uppercase font-bold tracking-widest transition-opacity">
+                          CURSE
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                  {players.filter(p => p.id !== myId).length === 0 && (
+                    <div className="text-center text-slate-600 italic py-4">No victims available...</div>
+                  )}
                 </div>
 
                 <button
-                  onClick={() => { setSpectatingTargetId(null); setSpectating(null); }}
-                  className="p-2 md:px-4 md:py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded font-bold transition-colors border border-slate-600 flex items-center justify-center"
+                  onClick={() => setSpellToCast(null)}
+                  className="mt-2 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-bold transition-colors"
                 >
-                  <span className="hidden md:inline">CLOSE VIEW</span>
-                  <X size={20} className="md:hidden" />
+                  CANCEL RITUAL
                 </button>
               </div>
             </div>
+          )
+        }
+      </div >
 
-            {/* Window Body */}
-            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+      {/* Spectator Window Modal */}
+      {
+        spectatingTargetId && targetPlayer && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-300">
+            <div className="w-full max-w-5xl bg-slate-950 border-2 border-red-600 rounded-lg shadow-2xl shadow-red-900/50 flex flex-col h-[85vh] overflow-hidden">
 
-              {/* Visuals (Scene) */}
-              <div className="flex-1 bg-black relative min-h-[30vh] md:min-h-[40vh]">
-                <GameScene
-                  isWon={targetPlayer.status === 'WON'}
-                  isLost={targetPlayer.status === 'LOST'}
-                  wrongGuesses={targetPlayer.mistakes}
-                />
+              {/* Window Header */}
+              <div className="flex items-center justify-between p-2 md:p-4 bg-red-950/30 border-b border-red-900/50 shrink-0">
+                <div className="flex items-center gap-2 md:gap-4 overflow-hidden">
+                  <button onClick={() => cycleSpectator(-1)} className="p-2 bg-black/40 hover:bg-red-900/40 rounded text-red-200 transition-colors shrink-0">
+                    <ChevronLeft size={20} />
+                  </button>
+                  <div className="text-center overflow-hidden">
+                    <div className="text-[10px] md:text-xs text-red-400 font-bold tracking-[0.2em] uppercase truncate">SPECTATING</div>
+                    <div className="text-lg md:text-2xl font-horror text-white tracking-wider truncate max-w-[120px] md:max-w-xs">{targetPlayer.name}</div>
+                  </div>
+                  <button onClick={() => cycleSpectator(1)} className="p-2 bg-black/40 hover:bg-red-900/40 rounded text-red-200 transition-colors shrink-0">
+                    <ChevronRight size={20} />
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2 md:gap-4 shrink-0">
+                  {/* Status Badge */}
+                  <div className={clsx(
+                    "px-2 py-1 md:px-3 md:py-1 rounded text-[10px] md:text-xs font-bold uppercase tracking-wider border",
+                    targetPlayer.status === 'WON' ? "bg-green-950 text-green-400 border-green-800" :
+                      targetPlayer.status === 'LOST' ? "bg-red-950 text-red-400 border-red-800" :
+                        "bg-blue-950 text-blue-400 border-blue-800"
+                  )}>
+                    {targetPlayer.status}
+                  </div>
+
+                  <button
+                    onClick={() => { setSpectatingTargetId(null); setSpectating(null); }}
+                    className="p-2 md:px-4 md:py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded font-bold transition-colors border border-slate-600 flex items-center justify-center"
+                  >
+                    <span className="hidden md:inline">CLOSE VIEW</span>
+                    <X size={20} className="md:hidden" />
+                  </button>
+                </div>
               </div>
 
-              {/* Controls / Info (Right Panel) */}
-              <div className="w-full lg:w-[400px] bg-slate-900/50 border-t lg:border-t-0 lg:border-l border-slate-800 p-6 flex flex-col overflow-y-auto">
+              {/* Window Body */}
+              <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
 
-                {/* Target's Word Progress */}
-                <div className="mb-8">
-                  <h3 className="text-slate-500 text-xs uppercase font-bold tracking-widest mb-4">Target's Ritual</h3>
-                  <div className="flex flex-wrap justify-center gap-2">
-                    {wordData?.word.split('').map((char, idx) => {
-                      if (char === ' ') return <div key={idx} className="w-4" />;
-                      const isGuessed = targetPlayer.guessedLetters.includes(char) || targetPlayer.status === 'LOST';
-                      // Checking "LOST" logic to reveal word if they lost
-                      return (
-                        <span
-                          key={idx}
-                          className={clsx(
-                            "w-8 h-10 border-b-2 flex items-center justify-center text-xl font-horror transition-all",
-                            isGuessed ? "border-slate-500 text-slate-200" : "border-slate-800 text-transparent",
-                            (targetPlayer.status === 'LOST') && !targetPlayer.guessedLetters.includes(char) && "text-red-600 border-red-900"
-                          )}
-                        >
-                          {isGuessed ? char : '_'}
-                        </span>
-                      );
-                    })}
-                  </div>
+                {/* Visuals (Scene) */}
+                <div className="flex-1 bg-black relative min-h-[30vh] md:min-h-[40vh]">
+                  <GameScene
+                    isWon={targetPlayer.status === 'WON'}
+                    isLost={targetPlayer.status === 'LOST'}
+                    wrongGuesses={targetPlayer.mistakes}
+                  />
                 </div>
 
-                {/* Target's Inputs (Keyboard) */}
-                <div className="mb-6">
-                  <h3 className="text-slate-500 text-xs uppercase font-bold tracking-widest mb-4">Keyboard State</h3>
-                  <div className="grid grid-cols-7 gap-1 opacity-80 pointer-events-none">
-                    {ALPHABET.map(letter => {
-                      const isGuessed = targetPlayer.guessedLetters.includes(letter);
-                      const isCorrect = wordData?.word.includes(letter);
-                      return (
-                        <div
-                          key={letter}
-                          className={clsx(
-                            "aspect-square rounded flex items-center justify-center font-bold text-xs border",
-                            isGuessed
-                              ? (isCorrect ? "bg-green-900/40 text-green-500 border-green-800" : "bg-red-900/30 text-red-500 border-red-900/50")
-                              : "bg-slate-800 text-slate-600 border-slate-700"
-                          )}
-                        >
-                          {letter}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
+                {/* Controls / Info (Right Panel) */}
+                <div className="w-full lg:w-[400px] bg-slate-900/50 border-t lg:border-t-0 lg:border-l border-slate-800 p-6 flex flex-col overflow-y-auto">
 
-                {/* Winner Powers & Mistakes */}
-                <div className="mt-auto space-y-4">
-                  {status === GameStatus.WON && (
-                    <div className="bg-red-950/20 p-4 rounded border border-red-900/30">
-                      <h3 className="text-red-400 text-[10px] uppercase font-bold tracking-widest mb-3 flex items-center gap-2">
-                        <Trophy size={12} /> Winner Powers
-                      </h3>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => castWinnerSpell('FOG')}
-                          disabled={winnerPowersUsed.FOG}
-                          className={clsx(
-                            "flex-1 py-2 text-[10px] font-bold uppercase rounded border transition-all",
-                            winnerPowersUsed.FOG
-                              ? "bg-slate-900 text-slate-600 border-slate-800 cursor-not-allowed"
-                              : "bg-purple-900/40 hover:bg-purple-800 text-purple-300 border-purple-500/50"
-                          )}
-                        >
-                          Fog
-                        </button>
-                        <button
-                          onClick={() => castWinnerSpell('SCRAMBLE')}
-                          disabled={winnerPowersUsed.SCRAMBLE}
-                          className={clsx(
-                            "flex-1 py-2 text-[10px] font-bold uppercase rounded border transition-all",
-                            winnerPowersUsed.SCRAMBLE
-                              ? "bg-slate-900 text-slate-600 border-slate-800 cursor-not-allowed"
-                              : "bg-orange-900/40 hover:bg-orange-800 text-orange-300 border-orange-500/50"
-                          )}
-                        >
-                          Mix
-                        </button>
-                        <button
-                          onClick={() => castWinnerSpell('JUMPSCARE')}
-                          disabled={winnerPowersUsed.JUMPSCARE}
-                          className={clsx(
-                            "flex-1 py-2 text-[10px] font-bold uppercase rounded border transition-all",
-                            winnerPowersUsed.JUMPSCARE
-                              ? "bg-slate-900 text-slate-600 border-slate-800 cursor-not-allowed"
-                              : "bg-red-900/40 hover:bg-red-800 text-red-300 border-red-500/50"
-                          )}
-                        >
-                          Scare
-                        </button>
-                      </div>
-                      <p className="text-[10px] text-slate-500 mt-2 text-center italic">
-                        1 free use per round.
-                      </p>
+                  {/* Target's Word Progress */}
+                  <div className="mb-8">
+                    <h3 className="text-slate-500 text-xs uppercase font-bold tracking-widest mb-4">Target's Ritual</h3>
+                    <div className="flex flex-wrap justify-center gap-2">
+                      {wordData?.word.split('').map((char, idx) => {
+                        if (char === ' ') return <div key={idx} className="w-4" />;
+                        const isGuessed = targetPlayer.guessedLetters.includes(char) || targetPlayer.status === 'LOST';
+                        // Checking "LOST" logic to reveal word if they lost
+                        return (
+                          <span
+                            key={idx}
+                            className={clsx(
+                              "w-8 h-10 border-b-2 flex items-center justify-center text-xl font-horror transition-all",
+                              isGuessed ? "border-slate-500 text-slate-200" : "border-slate-800 text-transparent",
+                              (targetPlayer.status === 'LOST') && !targetPlayer.guessedLetters.includes(char) && "text-red-600 border-red-900"
+                            )}
+                          >
+                            {isGuessed ? char : '_'}
+                          </span>
+                        );
+                      })}
                     </div>
-                  )}
-
-                  <div className="bg-slate-800/50 p-4 rounded text-center">
-                    <div className="text-slate-400 text-xs uppercase tracking-wider mb-1">Mistakes</div>
-                    <div className="text-3xl font-horror text-red-500">{targetPlayer.mistakes} / {MAX_MISTAKES}</div>
                   </div>
+
+                  {/* Target's Inputs (Keyboard) */}
+                  <div className="mb-6">
+                    <h3 className="text-slate-500 text-xs uppercase font-bold tracking-widest mb-4">Keyboard State</h3>
+                    <div className="grid grid-cols-7 gap-1 opacity-80 pointer-events-none">
+                      {ALPHABET.map(letter => {
+                        const isGuessed = targetPlayer.guessedLetters.includes(letter);
+                        const isCorrect = wordData?.word.includes(letter);
+                        return (
+                          <div
+                            key={letter}
+                            className={clsx(
+                              "aspect-square rounded flex items-center justify-center font-bold text-xs border",
+                              isGuessed
+                                ? (isCorrect ? "bg-green-900/40 text-green-500 border-green-800" : "bg-red-900/30 text-red-500 border-red-900/50")
+                                : "bg-slate-800 text-slate-600 border-slate-700"
+                            )}
+                          >
+                            {letter}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Winner Powers & Mistakes */}
+                  <div className="mt-auto space-y-4">
+                    {status === GameStatus.WON && (
+                      <div className="bg-red-950/20 p-4 rounded border border-red-900/30">
+                        <h3 className="text-red-400 text-[10px] uppercase font-bold tracking-widest mb-3 flex items-center gap-2">
+                          <Trophy size={12} /> Winner Powers
+                        </h3>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => castWinnerSpell('FOG')}
+                            disabled={winnerPowersUsed.FOG}
+                            className={clsx(
+                              "flex-1 py-2 text-[10px] font-bold uppercase rounded border transition-all",
+                              winnerPowersUsed.FOG
+                                ? "bg-slate-900 text-slate-600 border-slate-800 cursor-not-allowed"
+                                : "bg-purple-900/40 hover:bg-purple-800 text-purple-300 border-purple-500/50"
+                            )}
+                          >
+                            Fog
+                          </button>
+                          <button
+                            onClick={() => castWinnerSpell('SCRAMBLE')}
+                            disabled={winnerPowersUsed.SCRAMBLE}
+                            className={clsx(
+                              "flex-1 py-2 text-[10px] font-bold uppercase rounded border transition-all",
+                              winnerPowersUsed.SCRAMBLE
+                                ? "bg-slate-900 text-slate-600 border-slate-800 cursor-not-allowed"
+                                : "bg-orange-900/40 hover:bg-orange-800 text-orange-300 border-orange-500/50"
+                            )}
+                          >
+                            Mix
+                          </button>
+                          <button
+                            onClick={() => castWinnerSpell('JUMPSCARE')}
+                            disabled={winnerPowersUsed.JUMPSCARE}
+                            className={clsx(
+                              "flex-1 py-2 text-[10px] font-bold uppercase rounded border transition-all",
+                              winnerPowersUsed.JUMPSCARE
+                                ? "bg-slate-900 text-slate-600 border-slate-800 cursor-not-allowed"
+                                : "bg-red-900/40 hover:bg-red-800 text-red-300 border-red-500/50"
+                            )}
+                          >
+                            Scare
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-slate-500 mt-2 text-center italic">
+                          1 free use per round.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="bg-slate-800/50 p-4 rounded text-center">
+                      <div className="text-slate-400 text-xs uppercase tracking-wider mb-1">Mistakes</div>
+                      <div className="text-3xl font-horror text-red-500">{targetPlayer.mistakes} / {MAX_MISTAKES}</div>
+                    </div>
+                  </div>
+
                 </div>
-
               </div>
-            </div>
 
+            </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* --- GM NARRATIVE OVERLAY --- */}
-      {gmNarrative && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 w-full max-w-2xl px-4 pointer-events-none">
-          <div className="bg-black/90 border-2 border-red-900/50 p-6 rounded-lg text-center shadow-2xl shadow-red-900/40 animate-in fade-in slide-in-from-top-4 duration-500">
-            <div className="text-red-500 font-bold tracking-[0.3em] text-xs uppercase mb-2">THE SPIRIT WHISPERS</div>
-            <p className="text-xl md:text-2xl text-slate-100 font-serif italic leading-relaxed">"{gmNarrative}"</p>
+      {
+        gmNarrative && (
+          <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 w-full max-w-2xl px-4 pointer-events-none">
+            <div className="bg-black/90 border-2 border-red-900/50 p-6 rounded-lg text-center shadow-2xl shadow-red-900/40 animate-in fade-in slide-in-from-top-4 duration-500">
+              <div className="text-red-500 font-bold tracking-[0.3em] text-xs uppercase mb-2">THE SPIRIT WHISPERS</div>
+              <p className="text-xl md:text-2xl text-slate-100 font-serif italic leading-relaxed">"{gmNarrative}"</p>
+            </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* --- GM RULE WARNING --- */}
-      {activeRule !== 'NONE' && (
-        <div className="fixed bottom-32 left-1/2 -translate-x-1/2 z-40 bg-red-950/80 border border-red-500 px-6 py-2 rounded-full animate-pulse">
-          <span className="text-red-200 font-bold uppercase tracking-widest text-sm flex items-center gap-2">
-            <Skull size={16} /> CURSE ACTIVE: {activeRule.replace('_', ' ')}
-          </span>
-        </div>
-      )}
+      {
+        activeRule !== 'NONE' && (
+          <div className="fixed bottom-32 left-1/2 -translate-x-1/2 z-40 bg-red-950/80 border border-red-500 px-6 py-2 rounded-full animate-pulse">
+            <span className="text-red-200 font-bold uppercase tracking-widest text-sm flex items-center gap-2">
+              <Skull size={16} /> CURSE ACTIVE: {activeRule.replace('_', ' ')}
+            </span>
+          </div>
+        )
+      }
 
       {/* --- ATMOSPHERE EFFECTS --- */}
       <div className={clsx(
@@ -1747,6 +1848,6 @@ export default function App() {
         atmosphere === 'GLITCH' && "invert opacity-10"
       )} />
 
-    </div>
+    </div >
   );
 }

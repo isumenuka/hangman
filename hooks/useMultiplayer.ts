@@ -8,6 +8,7 @@ export const useMultiplayer = (
   onWorldUpdate: (players: Player[]) => void,
   onSpell: (spellId: 'FOG' | 'SCRAMBLE' | 'JUMPSCARE', casterName: string) => void,
   onSpellLog: (spellId: string, casterName: string, targetName: string) => void,
+  onMessage: (sender: string, text: string, isSystem?: boolean) => void,
   onCountdown: (count: number | null) => void
 ) => {
   // Local Identity
@@ -267,8 +268,11 @@ export const useMultiplayer = (
     else if (action.type === 'ROUND_COUNTDOWN') {
       onCountdown(action.payload.count);
     }
+    else if (action.type === 'CHAT_MESSAGE') {
+      onMessage(action.payload.sender, action.payload.text, action.payload.isSystem);
+    }
 
-  }, [amIHost, broadcast, onGameStart, onSpell, onSpellLog, onWorldUpdate, resolveName]);
+  }, [amIHost, broadcast, onGameStart, onSpell, onSpellLog, onMessage, onWorldUpdate, resolveName]);
 
   useEffect(() => {
     socketService.onAction(handleIncomingAction);
@@ -417,6 +421,17 @@ export const useMultiplayer = (
     castSpell,
     setSpectating,
     broadcastCountdown,
+
+    sendMessage: (text: string, isSystem: boolean = false) => {
+      if (!socketService.socket) return;
+      const action: NetworkAction = {
+        type: 'CHAT_MESSAGE',
+        payload: { sender: isSystem ? 'SYSTEM' : myName, text, isSystem }
+      };
+      broadcast(action);
+      // Local Display
+      onMessage(isSystem ? 'SYSTEM' : myName, text, isSystem);
+    },
 
     updateBot,
 
