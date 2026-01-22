@@ -15,6 +15,8 @@ import { PlayerList } from './components/PlayerList';
 import { RulesModal } from './components/RulesModal';
 import { Auth } from './components/Auth';
 import { GlobalLeaderboard } from './components/GlobalLeaderboard';
+import { DailyLeaderboardModal } from './components/DailyLeaderboardModal';
+import { DailyCountdown } from './components/DailyCountdown';
 import { updateGameStats, supabase, logGameHistory } from './utils/supabase';
 import { consultGameMaster } from './services/gameMaster';
 import { getBotAction } from './services/imposter';
@@ -93,6 +95,8 @@ export default function App() {
   const [showMobileList, setShowMobileList] = useState(false);
   const [showRules, setShowRules] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [showDailyLeaderboard, setShowDailyLeaderboard] = useState(false);
+  const [dailyTimeRemaining, setDailyTimeRemaining] = useState('');
 
   // --- Sabotage State ---
   const [curseEnergy, setCurseEnergy] = useState(100);
@@ -910,10 +914,15 @@ export default function App() {
         <div className="fixed top-6 left-6 z-50">
           <button
             onClick={() => setGameMode('DAILY')}
-            className="px-6 py-3 bg-purple-950/80 hover:bg-purple-900 text-purple-200 rounded-lg font-bold border border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.3)] transition-all hover:scale-105 hover:shadow-[0_0_25px_rgba(168,85,247,0.5)] flex items-center gap-3 backdrop-blur-md"
+            className="px-6 py-3 bg-purple-950/80 hover:bg-purple-900 text-purple-200 rounded-lg font-bold border border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.3)] transition-all hover:scale-105 hover:shadow-[0_0_25px_rgba(168,85,247,0.5)] backdrop-blur-md"
           >
-            <Clock size={20} className="text-purple-400 animate-pulse" />
-            <span className="tracking-widest uppercase text-sm">Daily Ritual</span>
+            <div className="flex items-center gap-3">
+              <Clock size={20} className="text-purple-400 animate-pulse" />
+              <div className="flex flex-col items-start">
+                <span className="tracking-widest uppercase text-sm">Daily Ritual</span>
+                <DailyCountdown />
+              </div>
+            </div>
           </button>
         </div>
 
@@ -945,16 +954,16 @@ export default function App() {
             </button>
 
             <button
-              onClick={() => setShowLeaderboard(true)}
-              className="py-3 bg-yellow-950/40 hover:bg-yellow-900/60 text-yellow-500 rounded font-bold border-l-4 border-yellow-700 transition-all flex items-center justify-center gap-2"
+              onClick={() => setShowDailyLeaderboard(true)}
+              className="py-3 bg-purple-950/40 hover:bg-purple-900/60 text-purple-400 rounded font-bold border-l-4 border-purple-700 transition-all flex items-center justify-center gap-2"
             >
-              <Trophy size={20} /> GLOBAL LEADERBOARD
+              <Trophy size={20} /> DAILY LEADERBOARD
             </button>
-
 
           </div>
 
           <RulesModal isOpen={showRules} onClose={() => setShowRules(false)} />
+          <DailyLeaderboardModal isOpen={showDailyLeaderboard} onClose={() => setShowDailyLeaderboard(false)} />
           <GlobalLeaderboard isOpen={showLeaderboard} onClose={() => setShowLeaderboard(false)} />
         </div>
       </div>

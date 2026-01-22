@@ -25,6 +25,8 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, onExit
     const [leaderboard, setLeaderboard] = useState<DailyAttempt[]>([]);
     const [hasAttempted, setHasAttempted] = useState(false);
     const [showTimer, setShowTimer] = useState(true);
+    const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+    const [yesterdayWinners, setYesterdayWinners] = useState<DailyAttempt[]>([]);
 
     // Timer State
     const [startTime, setStartTime] = useState<number>(0);
@@ -77,6 +79,13 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, onExit
                         setHasAttempted(true);
                     }
                 }
+
+                // 4. Fetch yesterday's top 3 winners
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                const yesterdayDate = yesterday.toISOString().split('T')[0];
+                const yesterdayLeaderboard = await getDailyLeaderboard(yesterdayDate);
+                setYesterdayWinners(yesterdayLeaderboard.slice(0, 3));
 
             } catch (e) {
                 console.error(e);
@@ -207,17 +216,48 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, onExit
     }
 
     return (
-        <div className="w-full h-full flex flex-col md:flex-row bg-slate-950 overflow-hidden">
+        <div className="w-full h-full flex items-center justify-center bg-slate-950 overflow-hidden relative">
 
             {/* Left: Leaderboard & Info (Lobby Style) */}
             {status === GameStatus.IDLE || status === GameStatus.WON || status === GameStatus.LOST ? (
-                <div className="w-full md:w-1/3 bg-black/80 border-r border-slate-800 p-6 flex flex-col z-20">
+                <div className="max-w-md w-full bg-slate-900/95 backdrop-blur-md rounded-lg border border-red-900/50 p-8 shadow-2xl shadow-red-900/20 z-20">
                     <button onClick={onExit} className="self-start text-slate-500 hover:text-white flex items-center gap-2 mb-6">
                         <ArrowLeft size={16} /> BACK TO MENU
                     </button>
 
                     <h1 className="text-4xl font-horror text-red-600 mb-2">DAILY RITUAL</h1>
                     <p className="text-slate-400 text-sm mb-6">One Word. Infinite Glory.</p>
+
+                    {/* Yesterday's Champions */}
+                    {yesterdayWinners.length > 0 && (
+                        <div className="mb-6 bg-slate-950/50 border border-yellow-700/30 rounded-lg p-4">
+                            <h3 className="text-yellow-500 text-xs uppercase font-bold tracking-widest mb-3 flex items-center gap-2">
+                                <Trophy size={14} /> Yesterday's Champions
+                            </h3>
+                            <div className="space-y-2">
+                                {yesterdayWinners.map((winner, idx) => (
+                                    <div key={winner.id} className="flex justify-between items-center">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xl">
+                                                {idx === 0 ? "🥇" : idx === 1 ? "🥈" : "🥉"}
+                                            </span>
+                                            <span className={clsx(
+                                                "font-bold text-sm",
+                                                idx === 0 && "text-yellow-200",
+                                                idx === 1 && "text-slate-300",
+                                                idx === 2 && "text-orange-300"
+                                            )}>
+                                                {winner.user_id}
+                                            </span>
+                                        </div>
+                                        <span className="font-mono text-slate-400 text-sm">
+                                            {(winner.time_taken / 1000).toFixed(2)}s
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Action Button */}
                     {status === GameStatus.IDLE ? (
@@ -258,38 +298,6 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, onExit
                             </button>
                         </div>
                     )}
-
-                    {/* Leaderboard */}
-                    <div className="flex-1 overflow-y-auto">
-                        <h3 className="text-slate-500 text-xs uppercase font-bold tracking-widest mb-4 flex items-center gap-2">
-                            <Trophy size={14} /> Top Sacrifices
-                        </h3>
-                        <div className="space-y-2">
-                            {leaderboard.map((entry, idx) => (
-                                <div key={entry.id} className={clsx(
-                                    "flex justify-between items-center p-3 rounded border",
-                                    idx === 0 ? "bg-yellow-950/30 border-yellow-700/50" : "bg-slate-900/50 border-slate-800"
-                                )}>
-                                    <div className="flex items-center gap-3">
-                                        <span className={clsx(
-                                            "font-bold w-6 text-center",
-                                            idx === 0 ? "text-yellow-500 text-xl" : "text-slate-500"
-                                        )}>{idx + 1}</span>
-                                        <span className={clsx(
-                                            "font-bold",
-                                            idx === 0 ? "text-yellow-200" : "text-slate-300"
-                                        )}>{entry.user_id}</span>
-                                    </div>
-                                    <span className="font-mono text-slate-400">
-                                        {(entry.time_taken / 1000).toFixed(2)}s
-                                    </span>
-                                </div>
-                            ))}
-                            {leaderboard.length === 0 && (
-                                <p className="text-slate-600 text-xs text-center italic py-4">Be the first to complete the ritual...</p>
-                            )}
-                        </div>
-                    </div>
                 </div>
             ) : null}
 
