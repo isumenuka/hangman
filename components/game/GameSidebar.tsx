@@ -216,7 +216,7 @@ export function GameSidebar({
 
                             {/* The Letters */}
                             <div className="flex flex-wrap justify-center gap-2">
-                                {wordData?.word.split('').map((char, idx) => {
+                                {(wordData?.word || '').split('').map((char, idx) => {
                                     if (char === ' ') return <div key={idx} className="w-3" />;
                                     // Logic for checking if guessed. Using displayGuessedLetters from props.
                                     const isGuessed = displayGuessedLetters.includes(char) || status === GameStatus.LOST;
@@ -344,7 +344,7 @@ export function GameSidebar({
                         </div>
                     )}
 
-                    {gameMode !== 'SINGLE' && (
+                    {gameMode !== 'SINGLE' && gameMode !== 'DAILY' && (
                         <div className="mb-4 space-y-2">
                             <div className="flex items-center justify-between gap-3 bg-slate-900/50 p-2 rounded border border-slate-700/50">
                                 <div className="flex-1 flex items-center gap-2">

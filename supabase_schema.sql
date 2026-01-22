@@ -2,8 +2,12 @@
 CREATE TABLE IF NOT EXISTS daily_challenges (
     date DATE PRIMARY KEY DEFAULT CURRENT_DATE,
     word TEXT NOT NULL CHECK (length(word) >= 10),
+    hints JSONB, -- Array of 5 strings
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- For existing tables, run this:
+-- ALTER TABLE daily_challenges ADD COLUMN IF NOT EXISTS hints JSONB;
 
 -- Policy: Anyone can read, Authenticated (or anon) can insert (race condition handled by PK)
 ALTER TABLE daily_challenges ENABLE ROW LEVEL SECURITY;

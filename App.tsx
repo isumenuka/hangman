@@ -906,6 +906,17 @@ export default function App() {
           <Auth />
         </div>
 
+        {/* Daily Ritual Top Left */}
+        <div className="fixed top-6 left-6 z-50">
+          <button
+            onClick={() => setGameMode('DAILY')}
+            className="px-6 py-3 bg-purple-950/80 hover:bg-purple-900 text-purple-200 rounded-lg font-bold border border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.3)] transition-all hover:scale-105 hover:shadow-[0_0_25px_rgba(168,85,247,0.5)] flex items-center gap-3 backdrop-blur-md"
+          >
+            <Clock size={20} className="text-purple-400 animate-pulse" />
+            <span className="tracking-widest uppercase text-sm">Daily Ritual</span>
+          </button>
+        </div>
+
         <div className="absolute inset-0 z-0 opacity-50">
           <GameScene wrongGuesses={0} isWon={false} isLost={false} />
         </div>
@@ -940,12 +951,7 @@ export default function App() {
               <Trophy size={20} /> GLOBAL LEADERBOARD
             </button>
 
-            <button
-              onClick={() => setGameMode('DAILY')}
-              className="py-3 bg-purple-950/40 hover:bg-purple-900/60 text-purple-400 rounded font-bold border-l-4 border-purple-700 transition-all flex items-center justify-center gap-2"
-            >
-              <Clock size={20} /> DAILY RITUAL
-            </button>
+
           </div>
 
           <RulesModal isOpen={showRules} onClose={() => setShowRules(false)} />
@@ -1042,6 +1048,16 @@ export default function App() {
         myId={myId}
         amIHost={amIHost}
         onNewGame={handleNewGame}
+      />
+    );
+  }
+
+  // --- Daily Ritual Mode ---
+  if (gameMode === 'DAILY') {
+    return (
+      <DailyChallenge
+        username={username}
+        onExit={() => setGameMode('MENU')}
       />
     );
   }

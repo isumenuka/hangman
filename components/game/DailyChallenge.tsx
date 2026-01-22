@@ -23,6 +23,8 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, onExit
     const [gameLog, setGameLog] = useState<{ id: number, content: React.ReactNode }[]>([]);
     const [loading, setLoading] = useState(true);
     const [leaderboard, setLeaderboard] = useState<DailyAttempt[]>([]);
+    const [hasAttempted, setHasAttempted] = useState(false);
+    const [showTimer, setShowTimer] = useState(true);
 
     // Timer State
     const [startTime, setStartTime] = useState<number>(0);
@@ -40,27 +42,59 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, onExit
             setLoading(true);
             try {
                 // 1. Fetch Word
-                const word = await getDailyWord();
-                if (!word) throw new Error("Could not summon daily ritual.");
+                const dailyData = await getDailyWord();
+                console.log('[DailyChallenge] Fetched Data:', dailyData);
 
-                // Mock WordData structure since DB only stores string for now
-                // Ideally we generate hints for it using Gemini if they are missing?
-                // For now, minimal structure.
+                if (!dailyData) throw new Error("Could not summon daily ritual.");
+
+                // Robust Hints Fallback
+                const safeHints = (dailyData.hints && dailyData.hints.length >= 5)
+                    ? dailyData.hints
+                    : [
+                        'The void whispers...',
+                        'Look closer at the shadows...',
+                        'A pattern emerges...',
+                        'The end is drawing near...',
+                        'S_C_I_I_E' // Fallback
+                    ];
+
                 setWordData({
-                    word: word,
+                    word: dailyData.word,
                     difficulty: 'Hard',
                     category: 'Daily Ritual',
-                    hint: 'The spirits are silent today...', // TODO: Fetch hints
-                    hints: ['A mystery from the void...', 'Focus your mind...']
+                    hint: safeHints[0],
+                    hints: safeHints
                 });
 
                 // 2. Fetch Leaderboard
                 const lb = await getDailyLeaderboard();
                 setLeaderboard(lb);
 
+                // 3. Check if user already attempted today
+                if (username) {
+                    const userAttempt = lb.find(a => a.user_id === username);
+                    if (userAttempt) {
+                        setHasAttempted(true);
+                    }
+                }
+
             } catch (e) {
                 console.error(e);
-                setGameLog(prev => [{ id: Date.now(), content: <span className="text-red-500">FAILED TO CONNECT TO VOID</span> }, ...prev]);
+                setGameLog(prev => [{ id: Date.now(), content: <span className="text-red-500">CONNECTION SEVERED. USING LOCAL RITUAL.</span> }, ...prev]);
+                // Fallback Word
+                setWordData({
+                    word: 'SACRIFICE',
+                    difficulty: 'Medium',
+                    category: 'Daily Ritual',
+                    hint: 'A necessary loss...',
+                    hints: [
+                        'First hint: It requires giving something up.',
+                        'Second hint: A holy offering.',
+                        'Third hint: To kill for a god.',
+                        'Fourth hint: One word, nine letters.',
+                        'Fifth hint: S_C_I_I_E'
+                    ]
+                });
             } finally {
                 setLoading(false);
             }
@@ -116,11 +150,18 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, onExit
 
     const handleStart = () => {
         if (!wordData) return;
+
         setStatus(GameStatus.PLAYING);
         setStartTime(Date.now());
         setElapsedTime(0);
         setGuessedLetters([]);
+        setShowTimer(true);
         soundManager.playClick();
+
+        // Fade out timer after 3 seconds
+        setTimeout(() => {
+            setShowTimer(false);
+        }, 3000);
 
         // Start Timer
         const start = Date.now();
@@ -141,6 +182,19 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, onExit
         if (wordData?.word.includes(letter)) soundManager.playCorrect();
         else soundManager.playWrong();
     };
+
+    // Keyboard Listener
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (status !== GameStatus.PLAYING) return;
+            const char = e.key.toUpperCase();
+            if (/^[A-Z]$/.test(char)) {
+                handleGuess(char);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [status, guessedLetters, wordData]);
 
 
     if (loading) {
@@ -168,17 +222,26 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, onExit
                     {/* Action Button */}
                     {status === GameStatus.IDLE ? (
                         <div className="mb-8">
-                            <div className="bg-slate-900 p-4 rounded border border-slate-700 mb-4">
-                                <p className="text-slate-300 text-sm text-center italic">
-                                    "Today's ritual requires sacrifice. Are you prepared?"
-                                </p>
-                            </div>
-                            <button
-                                onClick={handleStart}
-                                className="w-full py-4 bg-gradient-to-r from-red-900 to-red-700 hover:from-red-800 hover:to-red-600 text-white font-horror text-2xl tracking-widest rounded shadow-[0_0_20px_rgba(220,38,38,0.5)] transition-all hover:scale-105"
-                            >
-                                BEGIN RITUAL
-                            </button>
+                            {hasAttempted ? (
+                                <div className="bg-yellow-950/30 border border-yellow-700/50 p-4 rounded text-center">
+                                    <p className="text-yellow-400 font-bold mb-2">⚠️ Already Attempted</p>
+                                    <p className="text-slate-400 text-sm">You've already completed today's ritual. Come back tomorrow!</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="bg-slate-900 p-4 rounded border border-slate-700 mb-4">
+                                        <p className="text-slate-300 text-sm text-center italic">
+                                            "Today's ritual requires sacrifice. Are you prepared?"
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={handleStart}
+                                        className="w-full py-4 bg-gradient-to-r from-red-900 to-red-700 hover:from-red-800 hover:to-red-600 text-white font-horror text-2xl tracking-widest rounded shadow-[0_0_20px_rgba(220,38,38,0.5)] transition-all hover:scale-105"
+                                    >
+                                        BEGIN RITUAL
+                                    </button>
+                                </>
+                            )}
                         </div>
                     ) : (
                         <div className="mb-8 text-center">
@@ -230,72 +293,74 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, onExit
                 </div>
             ) : null}
 
-            {/* Game Area (Scene + Sidebar) */}
-            <div className="flex-1 flex flex-col md:flex-row relative">
-                {/* Timer Overlay */}
-                {status === GameStatus.PLAYING && (
-                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-black/50 backdrop-blur border border-red-500/30 px-6 py-2 rounded-full flex items-center gap-3">
-                        <Clock className="text-red-500 animate-pulse" size={20} />
-                        <span className="text-2xl font-mono font-bold text-red-100">
-                            {(elapsedTime / 1000).toFixed(2)}
-                        </span>
-                    </div>
-                )}
+            {/* Game Area (Scene + Sidebar) - Only show during active gameplay */}
+            {(status === GameStatus.PLAYING || status === GameStatus.WON || status === GameStatus.LOST) && (
+                <div className="flex-1 flex flex-col md:flex-row relative">
+                    {/* Timer Overlay */}
+                    {status === GameStatus.PLAYING && (
+                        <div className="absolute top-4 left-4 z-50 bg-black/50 backdrop-blur border border-red-500/30 px-6 py-2 rounded-full flex items-center gap-3">
+                            <Clock className="text-red-500 animate-pulse" size={20} />
+                            <span className="text-2xl font-mono font-bold text-red-100">
+                                {(elapsedTime / 1000).toFixed(2)}
+                            </span>
+                        </div>
+                    )}
 
-                {/* 3D Scene */}
-                <div className="relative w-full h-[40vh] md:h-full md:flex-1 bg-black">
-                    <GameSceneOverlay
-                        showJumpscare={false}
-                        currentJumpscareVideo=""
-                        setShowJumpscare={() => { }}
-                        autoNextRoundCountdown={null}
-                        round={1}
-                        gameLog={gameLog}
-                        mySpectators={[]}
-                        showHintUnlock={false}
-                    />
-                    <GameScene
-                        isWon={status === GameStatus.WON}
-                        isLost={status === GameStatus.LOST}
+                    {/* 3D Scene */}
+                    <div className="relative w-full h-[40vh] md:h-full md:flex-1 bg-black">
+                        <GameSceneOverlay
+                            showJumpscare={false}
+                            currentJumpscareVideo=""
+                            setShowJumpscare={() => { }}
+                            autoNextRoundCountdown={null}
+                            round={1}
+                            gameLog={gameLog}
+                            mySpectators={[]}
+                            showHintUnlock={false}
+                        />
+                        <GameScene
+                            isWon={status === GameStatus.WON}
+                            isLost={status === GameStatus.LOST}
+                            wrongGuesses={wrongGuesses}
+                        />
+                    </div>
+
+                    {/* Sidebar (Force Minimal Mode?) */}
+                    <GameSidebar
+                        status={status}
+                        players={[{ id: 'me', name: username, mistakes: wrongGuesses, status: isWon ? 'WON' : isLost ? 'LOST' : 'PLAYING' } as any]}
+                        username={username}
+                        amIHost={true}
+                        spawnBot={() => { }}
+                        setShowRules={() => { }}
+                        showRules={false}
+                        loadingDifficulty={null}
+                        wordData={wordData}
+                        guessedLetters={guessedLetters}
+                        displayGuessedLetters={guessedLetters}
+                        unlockedHints={wrongGuesses + 1}
+                        revealedHints={wrongGuesses + 1}
+                        gameMode={'DAILY'}
+                        activeDebuffs={[]}
+                        curseEnergy={0}
                         wrongGuesses={wrongGuesses}
+                        handleGuess={handleGuess}
+                        performSpellAction={() => { }}
+                        onSoulMend={() => { }}
+                        handleStartGame={handleStart} // Retry?
+                        handleOracle={() => { }} // Disable powers
+                        handleRoast={() => { }}
+                        handleGlitch={() => { }}
+                        hasScared={false}
+                        round={1}
+                        spectatingTargetId={null}
+                        setSpectatingTargetId={() => { }}
+                        setSpectating={() => { }}
+                        autoNextRoundCountdown={null}
+                        myId={'me'}
                     />
                 </div>
-
-                {/* Sidebar (Force Minimal Mode?) */}
-                <GameSidebar
-                    status={status}
-                    players={[{ id: 'me', name: username, mistakes: wrongGuesses, status: isWon ? 'WON' : isLost ? 'LOST' : 'PLAYING' } as any]}
-                    username={username}
-                    amIHost={true}
-                    spawnBot={() => { }}
-                    setShowRules={() => { }}
-                    showRules={false}
-                    loadingDifficulty={null}
-                    wordData={wordData}
-                    guessedLetters={guessedLetters}
-                    displayGuessedLetters={guessedLetters}
-                    unlockedHints={1} // Only 1 hint for daily?
-                    revealedHints={1}
-                    gameMode={'SINGLE'} // Reuse Single logic for UI
-                    activeDebuffs={[]}
-                    curseEnergy={0}
-                    wrongGuesses={wrongGuesses}
-                    handleGuess={handleGuess}
-                    performSpellAction={() => { }}
-                    onSoulMend={() => { }}
-                    handleStartGame={handleStart} // Retry?
-                    handleOracle={() => { }} // Disable powers
-                    handleRoast={() => { }}
-                    handleGlitch={() => { }}
-                    hasScared={false}
-                    round={1}
-                    spectatingTargetId={null}
-                    setSpectatingTargetId={() => { }}
-                    setSpectating={() => { }}
-                    autoNextRoundCountdown={null}
-                    myId={'me'}
-                />
-            </div>
+            )}
         </div>
     );
 };
