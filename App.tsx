@@ -34,7 +34,7 @@ export default function App() {
   const [usedWords, setUsedWords] = useState<string[]>([]);
   const [guessedLetters, setGuessedLetters] = useState<string[]>([]);
   const [status, setStatus] = useState<GameStatus>(GameStatus.IDLE);
-  const [loading, setLoading] = useState(false);
+  const [loadingDifficulty, setLoadingDifficulty] = useState<'Easy' | 'Medium' | 'Hard' | null>(null);
   const [lobbyError, setLobbyError] = useState<string | null>(null);
   const [username, setUsername] = useState('');
 
@@ -576,9 +576,9 @@ export default function App() {
   // --- Actions ---
 
   const handleStartGame = async (difficulty: 'Easy' | 'Medium' | 'Hard' = 'Medium') => {
-    if (loading) return;
+    if (loadingDifficulty) return;
     soundManager.playClick();
-    setLoading(true);
+    setLoadingDifficulty(difficulty);
 
     // Check if we need to generate a new batch or pop from queue
     let dataToUse: WordData;
@@ -660,7 +660,7 @@ export default function App() {
       }, ...prev]);
 
     } finally {
-      setLoading(false);
+      setLoadingDifficulty(null);
     }
   };
 
@@ -1044,24 +1044,24 @@ export default function App() {
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     onClick={() => handleStartGame('Easy')}
-                    disabled={loading || players.length < 1}
+                    disabled={!!loadingDifficulty || players.length < 1}
                     className="py-4 bg-green-950/40 hover:bg-green-600 border border-green-800 hover:border-green-400 rounded font-bold text-xs md:text-sm uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
                   >
-                    {loading ? <Loader2 className="animate-spin mx-auto" /> : <span className="group-hover:text-white text-green-400">Initiate</span>}
+                    {loadingDifficulty === 'Easy' ? <Loader2 className="animate-spin mx-auto" /> : <span className="group-hover:text-white text-green-400">Initiate</span>}
                   </button>
                   <button
                     onClick={() => handleStartGame('Medium')}
-                    disabled={loading || players.length < 1}
+                    disabled={!!loadingDifficulty || players.length < 1}
                     className="py-4 bg-yellow-950/40 hover:bg-yellow-600 border border-yellow-800 hover:border-yellow-400 rounded font-bold text-xs md:text-sm uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
                   >
-                    {loading ? <Loader2 className="animate-spin mx-auto" /> : <span className="group-hover:text-white text-yellow-400">Summon</span>}
+                    {loadingDifficulty === 'Medium' ? <Loader2 className="animate-spin mx-auto" /> : <span className="group-hover:text-white text-yellow-400">Summon</span>}
                   </button>
                   <button
                     onClick={() => handleStartGame('Hard')}
-                    disabled={loading || players.length < 1}
+                    disabled={!!loadingDifficulty || players.length < 1}
                     className="py-4 bg-red-950/40 hover:bg-red-600 border border-red-800 hover:border-red-400 rounded font-bold text-xs md:text-sm uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
                   >
-                    {loading ? <Loader2 className="animate-spin mx-auto" /> : <span className="group-hover:text-white text-red-400">Curse</span>}
+                    {loadingDifficulty === 'Hard' ? <Loader2 className="animate-spin mx-auto" /> : <span className="group-hover:text-white text-red-400">Curse</span>}
                   </button>
                 </div>
               </div>
@@ -1357,7 +1357,7 @@ export default function App() {
 
           {/* Word Display Area */}
           <div className="mb-8 flex flex-col items-center justify-center min-h-[120px] bg-black/20 rounded-lg p-4 border border-slate-800/50">
-            {loading ? (
+            {loadingDifficulty ? (
               <div className="flex flex-col items-center animate-pulse gap-2">
                 <Loader2 size={32} className="text-red-700 animate-spin" />
                 <span className="font-horror text-xl text-red-800">SUMMONING...</span>
