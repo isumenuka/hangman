@@ -43,7 +43,33 @@ export interface PlayerStats {
     wins: number;
     games_played: number;
     best_time_ms: number | null;
+    best_time_ms: number | null;
     total_scares: number;
+}
+
+export interface DailyChallenge {
+    date: string;
+    word: string;
+    created_at: string;
+}
+
+export interface DailyAttempt {
+    id: string;
+    challenge_date: string;
+    user_id: string;
+    time_taken: number;
+    created_at: string;
+}
+
+export interface GameHistoryEntry {
+    id?: string;
+    word: string;
+    difficulty: string;
+    result: 'WON' | 'LOST';
+    time_taken: number;
+    scares_used: number;
+    user_id: string;
+    played_at?: string;
 }
 
 // --- Helpers ---
@@ -96,3 +122,18 @@ export const updateGameStats = async (isWin: boolean, timeTaken: number, scaresU
         console.error("Make sure to run the update_stats_schema.sql script in Supabase!");
     }
 }
+
+export const logGameHistory = async (entry: GameHistoryEntry) => {
+    const { error } = await supabase
+        .from('game_history')
+        .insert({
+            word: entry.word,
+            difficulty: entry.difficulty,
+            result: entry.result,
+            time_taken: entry.time_taken,
+            scares_used: entry.scares_used,
+            user_id: entry.user_id
+        });
+
+    if (error) console.error("Failed to log game history:", error);
+};

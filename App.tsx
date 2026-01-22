@@ -4,9 +4,10 @@ import { Lobby } from './components/game/Lobby';
 import { GameOver } from './components/game/GameOver';
 import { GameSceneOverlay } from './components/game/GameSceneOverlay';
 import { GameSidebar } from './components/game/GameSidebar';
+import { DailyChallenge } from './components/game/DailyChallenge';
 import { generateWord, generateTournamentBatch } from './services/wordGenerator';
 import { GameStatus, WordData, Player, AtmosphereType } from './types';
-import { Play, RotateCcw, HelpCircle, Loader2, Trophy, Skull, Users, Copy, Link, User, ChevronLeft, ChevronRight, X, Eye, Scroll } from 'lucide-react';
+import { Play, RotateCcw, HelpCircle, Loader2, Trophy, Skull, Users, Copy, Link, User, ChevronLeft, ChevronRight, X, Eye, Scroll, Clock } from 'lucide-react';
 import clsx from 'clsx';
 import { soundManager } from './utils/SoundManager';
 import { useMultiplayer } from './hooks/useMultiplayer';
@@ -14,7 +15,7 @@ import { PlayerList } from './components/PlayerList';
 import { RulesModal } from './components/RulesModal';
 import { Auth } from './components/Auth';
 import { GlobalLeaderboard } from './components/GlobalLeaderboard';
-import { updateGameStats, supabase } from './utils/supabase';
+import { updateGameStats, supabase, logGameHistory } from './utils/supabase';
 import { consultGameMaster } from './services/gameMaster';
 import { getBotAction } from './services/imposter';
 import { getOracleHint, generateRoast, generateGlitchText, getRitualPhrase } from './services/powers';
@@ -87,7 +88,7 @@ export default function App() {
 
 
   // --- Multiplayer State ---
-  const [gameMode, setGameMode] = useState<'MENU' | 'SINGLE' | 'LOBBY_SETUP' | 'LOBBY_HOST' | 'LOBBY_JOIN'>('MENU');
+  const [gameMode, setGameMode] = useState<'MENU' | 'SINGLE' | 'LOBBY_SETUP' | 'LOBBY_HOST' | 'LOBBY_JOIN' | 'DAILY'>('MENU');
   const [joinInputId, setJoinInputId] = useState('');
   const [showMobileList, setShowMobileList] = useState(false);
   const [showRules, setShowRules] = useState(false);
@@ -141,6 +142,7 @@ export default function App() {
   const [showGameOver, setShowGameOver] = useState(false);
   const [showJumpscare, setShowJumpscare] = useState(false);
   const [currentJumpscareVideo, setCurrentJumpscareVideo] = useState('');
+  const [showDailyLogic, setShowDailyLogic] = useState(false);
 
   // --- GM Logic ---
   const triggerGM = async () => {
@@ -487,8 +489,19 @@ export default function App() {
 
         updateMyStatus('WON', wrongGuesses, guessedLetters, newTotal);
 
+
         // Track Win Stats - MOVED TO TOURNAMENT END
         // updateGameStats(true, timeTaken, hasScared ? 1 : 0, username);
+
+        // Log History
+        logGameHistory({
+          word: wordData?.word || '',
+          difficulty: wordData?.difficulty || 'Unknown',
+          result: 'WON',
+          time_taken: timeTaken,
+          scares_used: hasScared ? 1 : 0,
+          user_id: username
+        });
       } else if (isLost) {
         setStatus(GameStatus.LOST);
         soundManager.playLose();
@@ -501,8 +514,19 @@ export default function App() {
 
         updateMyStatus('LOST', wrongGuesses, guessedLetters, newTotal);
 
+
         // Track Loss Stats - MOVED TO TOURNAMENT END
         // updateGameStats(false, timeTaken, hasScared ? 1 : 0, username);
+
+        // Log History
+        logGameHistory({
+          word: wordData?.word || '',
+          difficulty: wordData?.difficulty || 'Unknown',
+          result: 'LOST',
+          time_taken: timeTaken,
+          scares_used: hasScared ? 1 : 0,
+          user_id: username
+        });
       } else {
         // Still playing, report mistakes (and current accumulated time? No need until end)
         updateMyStatus('PLAYING', wrongGuesses, guessedLetters, totalTimeTaken);
@@ -914,6 +938,13 @@ export default function App() {
               className="py-3 bg-yellow-950/40 hover:bg-yellow-900/60 text-yellow-500 rounded font-bold border-l-4 border-yellow-700 transition-all flex items-center justify-center gap-2"
             >
               <Trophy size={20} /> GLOBAL LEADERBOARD
+            </button>
+
+            <button
+              onClick={() => setGameMode('DAILY')}
+              className="py-3 bg-purple-950/40 hover:bg-purple-900/60 text-purple-400 rounded font-bold border-l-4 border-purple-700 transition-all flex items-center justify-center gap-2"
+            >
+              <Clock size={20} /> DAILY RITUAL
             </button>
           </div>
 
