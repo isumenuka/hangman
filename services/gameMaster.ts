@@ -48,6 +48,7 @@ export const consultGameMaster = async (
       - "VOWELS_DISABLED": Punish them, maybe if they are spamming vowels.
       - "Invert_Controls": Only if they are doing very well.
       - "Double_Damage": If they have few misses, make the next one hurt more.
+      - "SILENCE": If 'Chat_Frequency' is HIGH. Penalize talking.
       
       ATMOSPHERE:
       - "RED_FOG": Anger/Danger.
@@ -62,7 +63,7 @@ export const consultGameMaster = async (
         properties: {
             narrative: { type: SchemaType.STRING },
             attitude: { type: SchemaType.STRING, enum: ['Sadistic', 'Helpful', 'Cryptic', 'Bored'] },
-            rule_change: { type: SchemaType.STRING, enum: ['NONE', 'VOWELS_DISABLED', 'Invert_Controls', 'Double_Damage'] },
+            rule_change: { type: SchemaType.STRING, enum: ['NONE', 'VOWELS_DISABLED', 'Invert_Controls', 'Double_Damage', 'SILENCE'] },
             atmosphere: { type: SchemaType.STRING, enum: ['NONE', 'RED_FOG', 'GLITCH', 'DARKNESS'] }
         },
         required: ["narrative", "attitude"]

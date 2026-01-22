@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { GameScene } from './components/Scene';
-import { generateWord } from './services/wordGenerator';
-import { GameStatus, WordData, Player } from './types';
-import { Play, RotateCcw, HelpCircle, Loader2, Trophy, Skull, Users, Copy, Link, User, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { generateWord, generateTournamentBatch } from './services/wordGenerator';
+import { GameStatus, WordData, Player, AtmosphereType } from './types';
+import { Play, RotateCcw, HelpCircle, Loader2, Trophy, Skull, Users, Copy, Link, User, ChevronLeft, ChevronRight, X, Eye, Scroll } from 'lucide-react';
 import clsx from 'clsx';
 import { soundManager } from './utils/SoundManager';
 import { useMultiplayer } from './hooks/useMultiplayer';
@@ -13,7 +13,7 @@ import { GlobalLeaderboard } from './components/GlobalLeaderboard';
 import { updateGameStats, supabase } from './utils/supabase';
 import { consultGameMaster } from './services/gameMaster';
 import { getBotAction } from './services/imposter';
-import { getOracleHint, generateRoast, generateGlitchText } from './services/powers';
+import { getOracleHint, generateRoast, generateGlitchText, getRitualPhrase } from './services/powers';
 import ShaderBackground from './components/ShaderBackground';
 
 const MAX_MISTAKES = 5;
@@ -36,10 +36,19 @@ export default function App() {
   const [lobbyError, setLobbyError] = useState<string | null>(null);
   const [username, setUsername] = useState('');
 
+  // --- Gemini 2.0 Feature State ---
+  const [wordQueue, setWordQueue] = useState<WordData[]>([]);
+  const [prophecy, setProphecy] = useState<string | null>(null);
+  const [showProphecy, setShowProphecy] = useState(false);
+  const [showRitualInput, setShowRitualInput] = useState(false);
+  const [ritualPhrase, setRitualPhrase] = useState('');
+  const [userRitualInput, setUserRitualInput] = useState('');
+  const [revealedHints, setRevealedHints] = useState(1);
+
   // --- GM State ---
   const [gmNarrative, setGmNarrative] = useState<string | null>(null);
-  const [activeRule, setActiveRule] = useState<'NONE' | 'VOWELS_DISABLED' | 'Invert_Controls'>('NONE');
-  const [atmosphere, setAtmosphere] = useState<'NONE' | 'RED_FOG' | 'GLITCH' | 'DARKNESS'>('NONE');
+  const [activeRule, setActiveRule] = useState<'NONE' | 'VOWELS_DISABLED' | 'Invert_Controls' | 'SILENCE'>('NONE');
+  const [atmosphere, setAtmosphere] = useState<AtmosphereType>('NONE');
 
 
 
@@ -210,6 +219,20 @@ export default function App() {
   }, []);
 
   const handleMessage = useCallback((sender: string, text: string, isSystem?: boolean) => {
+    // Logic: If Silence Rule is active, punish sender!
+    if (activeRule === 'SILENCE' && !isSystem && sender === username) {
+      // Ideally we check if 'sender' is ME. But sender is a string name here.
+      // We rely on 'sender === username'. 
+      // Punishment: Remove random revealed letter or Add Mistake?
+      // Let's add Mistake for immediate impact.
+      // But we need to call updateMyStatus? 
+      // Simpler: Just Visual Feedback + Warning for now, mechanics are tricky inside callback.
+      // ACTUALLY: We can trigger a "glitch" or sound.
+      soundManager.playWrong();
+      setGameLog(prev => [{ id: Date.now(), content: <span className="text-red-600 font-bold uppercase">THE SPIRIT DEMANDS SILENCE!</span> }, ...prev]);
+      // Proceed to send message anyway, but maybe red?
+    }
+
     const content = isSystem ? (
       <span className="text-red-500 font-bold uppercase tracking-widest animate-pulse border-l-2 border-red-500 pl-2 block my-1 shadow-[0_0_10px_rgba(220,38,38,0.5)]">{text}</span>
     ) : (
@@ -218,7 +241,7 @@ export default function App() {
       </span>
     );
     setGameLog(prev => [{ id: Date.now(), content }, ...prev]);
-  }, []);
+  }, [activeRule, username]);
 
 
 
@@ -503,7 +526,7 @@ export default function App() {
     console.log('[Hint System]', { lossPercent: lossPercent.toFixed(1), currentHints: unlockedHints, newHintCount });
 
     if (newHintCount > unlockedHints) {
-      console.log('[Hint System] UNLOCKING NEW HINT!', newHintCount);
+      // UNLOCKED but NOT REVEALED
       setUnlockedHints(newHintCount);
       setShowHintUnlock(true);
       soundManager.playWin();
@@ -526,44 +549,49 @@ export default function App() {
     if (loading) return;
     soundManager.playClick();
     setLoading(true);
-    // Increment Round if we are already playing/played
-    let nextRound = round;
-    if (status !== GameStatus.IDLE) {
-      nextRound = round + 1;
-      setRound(nextRound);
-      // Don't set IDLE here to prevent Scene unmounting/flashing Lobby
-    } else {
-      setStatus(GameStatus.IDLE);
-    }
 
-    setUnlockedHints(1); // Reset hints on new game
+    // Check if we need to generate a new batch or pop from queue
+    let dataToUse: WordData;
+    let nextRound = round;
 
     try {
-      const data = await generateWord(usedWords);
+      if (status !== GameStatus.IDLE) {
+        nextRound = round + 1;
+      }
 
-      // Track used words to prevent repetition in this session
-      setUsedWords(prev => {
-        const newHistory = [...prev, data.word];
-        return newHistory.slice(-200); // Keep last 200
-      });
+      // Logic: If queue empty OR Round 1, generate batch. 
+      // If queue has items and we are just moving to next round, use queue.
+      if (wordQueue.length > 0 && nextRound > 1) {
+        dataToUse = wordQueue[0];
+        setWordQueue(prev => prev.slice(1));
+      } else {
+        // New Batch Needed (Round 1 or Forced)
+        // Provide history for infinite difficulty?
+        const history = { winRate: 0.5 }; // Simplification for now
+        const batch = await generateTournamentBatch(usedWords, history);
 
-      // Use AI hints if available, otherwise fallback to generated ones (safety)
-      const finalHints = data.hints && data.hints.length === 5 ? data.hints : [
-        data.hint,
-        `Related to: ${data.difficulty} difficulty`,
-        `Category clue: Think carefully...`,
-        `Contains ${data.word.length} letters`,
-        `First letter is: ${data.word[0]}`
-      ];
+        dataToUse = batch.words[0];
+        setWordQueue(batch.words.slice(1));
+        setProphecy(batch.prophecy);
+        setShowProphecy(true); // SHOW PROPHECY!
+      }
 
-      const enhancedData: WordData = {
-        ...data,
-        hints: finalHints
-      };
+      setRound(nextRound);
+
+      setUnlockedHints(1);
+      setRevealedHints(1);
+      setHasScared(false);
+      setWinnerPowersUsed({ FOG: false, SCRAMBLE: false, JUMPSCARE: false });
+
+      // Track used words
+      setUsedWords(prev => [...prev, dataToUse.word].slice(-200));
+
+      const enhancedData: WordData = { ...dataToUse };
 
       if (gameMode === 'SINGLE') {
-        // ... unused logic kept for type safety ...
         setWordData(enhancedData);
+        setGuessedLetters([]);
+        setStatus(GameStatus.PLAYING);
       } else if (amIHost) {
         startGame(enhancedData, nextRound);
         setWordData(enhancedData);
@@ -1348,26 +1376,49 @@ export default function App() {
                     showVisualRiddle ? "bg-purple-900 text-purple-200 border-purple-500" : "bg-slate-800 text-slate-400 border-slate-700 hover:border-purple-500"
                   )}
                 >
-                  👁️ {showVisualRiddle ? "Hide Vision" : "Invoke Vision"}
+                  <Eye size={12} /> {showVisualRiddle ? "Hide Vision" : "Invoke Vision"}
                 </button>
               )}
             </div>
 
             <div className="space-y-2">
               {wordData?.hints ? (
-                // Multi-hint system
-                wordData.hints.slice(0, unlockedHints).map((hint, i) => (
-                  <div key={i} className="bg-gradient-to-r from-purple-950/40 to-slate-900/40 p-3 rounded-lg border border-purple-500/30 animate-in slide-in-from-left">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">Hint {i + 1}</span>
-                      {i === 0 && <span className="text-[10px] text-slate-500">(Free)</span>}
-                      {i > 0 && <span className="text-[10px] text-red-400">({i * 20}% Sacrifice)</span>}
+                // Multi-hint system with Ritual Locking
+                Array.from({ length: 5 }).map((_, i) => {
+                  const isUnlocked = i + 1 <= unlockedHints;
+                  const isRevealed = i + 1 <= revealedHints;
+                  if (!isUnlocked) return null; // Don't show future hints at all
+
+                  return (
+                    <div key={i} className="bg-gradient-to-r from-purple-950/40 to-slate-900/40 p-3 rounded-lg border border-purple-500/30 animate-in slide-in-from-left">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">Hint {i + 1}</span>
+                        {i === 0 && <span className="text-[10px] text-slate-500">(Free)</span>}
+                      </div>
+
+                      {isRevealed || i === 0 ? (
+                        <p className="text-slate-300 text-sm italic leading-relaxed">"{wordData.hints![i]}"</p>
+                      ) : (
+                        <div className="flex flex-col gap-2">
+                          <p className="text-slate-500 text-sm italic blur-sm select-none">"The secrets of the void are hidden..."</p>
+                          <button
+                            onClick={async () => {
+                              const phrase = await getRitualPhrase();
+                              setRitualPhrase(phrase);
+                              setUserRitualInput('');
+                              setShowRitualInput(true);
+                            }}
+                            className="w-full py-1 bg-purple-900/20 hover:bg-purple-900/50 border border-purple-500/50 text-purple-300 text-xs uppercase font-bold transition-all flex items-center justify-center gap-2"
+                          >
+                            <Scroll size={12} /> Perform Ritual to Reveal
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    <p className="text-slate-300 text-sm italic leading-relaxed">"{hint}"</p>
-                  </div>
-                ))
+                  );
+                })
               ) : (
-                // Fallback: Always show single hint if hints array doesn't exist
+                // Fallback
                 wordData?.hint && (
                   <div className="bg-gradient-to-r from-purple-950/40 to-slate-900/40 p-3 rounded-lg border border-purple-500/30">
                     <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">Hint</span>
@@ -1828,6 +1879,71 @@ export default function App() {
           </div>
         )
       }
+
+      {/* --- MOCK Prophecy Modal --- */}
+      {showProphecy && prophecy && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-1000">
+          <div className="max-w-xl w-full text-center space-y-8 relative">
+            {/* Ancient Scroll effect or just text */}
+            <div className="text-red-600 font-horror text-4xl tracking-widest animate-pulse">THE PROPHECY</div>
+            <div className="p-8 border-y-2 border-red-900/30 bg-red-950/10">
+              <p className="text-2xl text-slate-200 font-serif italic leading-loose whitespace-pre-line">
+                {prophecy}
+              </p>
+            </div>
+            <button
+              onClick={() => setShowProphecy(false)}
+              className="px-8 py-3 bg-red-900/20 hover:bg-red-900/40 border border-red-800 text-red-200 font-bold uppercase tracking-widest transition-all hover:scale-105"
+            >
+              ACCEPT FATE
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* --- RITUAL INPUT MODAL --- */}
+      {showRitualInput && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="max-w-md w-full bg-slate-900 border border-purple-900 p-6 rounded shadow-2xl shadow-purple-900/20">
+            <h3 className="text-purple-400 font-bold uppercase tracking-widest text-center mb-4">Complete the Ritual</h3>
+            <p className="text-slate-400 text-center text-sm mb-6">"Type the incantation exactly to unlock the knowledge."</p>
+
+            <div className="bg-black/50 p-4 rounded mb-6 text-center border border-slate-800">
+              <p className="text-xl text-purple-200 font-serif italic select-none pointer-events-none blur-[0.5px]">
+                {ritualPhrase}
+              </p>
+            </div>
+
+            <input
+              autoFocus
+              value={userRitualInput}
+              onChange={(e) => setUserRitualInput(e.target.value)}
+              className="w-full bg-black border border-purple-500/50 rounded p-3 text-center text-white mb-4 focus:outline-none focus:border-purple-400 font-mono"
+              placeholder="Type the incantation..."
+            />
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowRitualInput(false)}
+                className="flex-1 py-3 bg-slate-800 text-slate-400 font-bold uppercase hover:bg-slate-700 rounded"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={userRitualInput.toLowerCase().trim() !== ritualPhrase.toLowerCase().trim()}
+                onClick={() => {
+                  soundManager.playWin();
+                  setShowRitualInput(false);
+                  setRevealedHints(h => h + 1);
+                }}
+                className="flex-1 py-3 bg-purple-900 hover:bg-purple-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold uppercase rounded border border-purple-500/50"
+              >
+                Break Seal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* --- GM RULE WARNING --- */}
       {

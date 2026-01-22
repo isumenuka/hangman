@@ -1,10 +1,18 @@
 export interface WordData {
+  id?: string; // Unique ID for tracking in batch
   word: string;
   hint: string; // Legacy/Primary hint
   hints?: string[]; // Progressive hints (5 total)
   visual_hint_css?: string; // Abstract CSS art hint
   difficulty: 'Easy' | 'Medium' | 'Hard';
 }
+
+export interface TournamentData {
+  words: WordData[];
+  prophecy: string;
+}
+
+export type AtmosphereType = 'NONE' | 'RED_FOG' | 'GLITCH' | 'DARKNESS';
 
 export enum GameStatus {
   IDLE = 'IDLE',
@@ -18,6 +26,7 @@ export interface GameState {
   wordData: WordData | null;
   guessedLetters: string[];
   wrongGuesses: number;
+  atmosphere: AtmosphereType;
 }
 
 // Multiplayer Types

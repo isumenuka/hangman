@@ -2,6 +2,7 @@ import React, { useRef, useMemo, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Stars, Sparkles, Cloud } from '@react-three/drei';
 import * as THREE from 'three';
+import { AtmosphereType } from '../types';
 
 // Fix for missing JSX types for react-three-fiber elements
 declare global {
@@ -295,6 +296,7 @@ interface SceneProps {
   wrongGuesses: number;
   isWon: boolean;
   isLost: boolean;
+  atmosphere?: AtmosphereType;
 }
 
 const ResponsiveCamera = () => {
@@ -340,57 +342,94 @@ const ResponsiveCamera = () => {
   return null;
 };
 
-export const GameScene: React.FC<SceneProps> = ({ wrongGuesses, isWon, isLost }) => {
+export const GameScene: React.FC<SceneProps> = ({ wrongGuesses, isWon, isLost, atmosphere = 'NONE' }) => {
+
+  const settings = useMemo(() => {
+    switch (atmosphere) {
+      case 'RED_FOG': return {
+        fog: '#3d0000',
+        ambient: '#550000',
+        spot: '#ff4444',
+        rim: '#ff0000',
+        bg: '#1a0505',
+        spotIntensity: 5
+      };
+      case 'DARKNESS': return {
+        fog: '#000000',
+        ambient: '#020202',
+        spot: '#444444',
+        rim: '#222222',
+        bg: '#000000',
+        spotIntensity: 2
+      };
+      case 'GLITCH': return {
+        fog: '#0f0f1a',
+        ambient: '#4338ca', // Indigo
+        spot: '#a855f7', // Purple
+        rim: '#22d3ee',
+        bg: '#000000',
+        spotIntensity: 6
+      };
+      default: return {
+        fog: '#1a1d29',
+        ambient: '#c7d2fe',
+        spot: '#a5b4fc',
+        rim: '#22d3ee',
+        bg: '#1a1d29',
+        spotIntensity: 4
+      };
+    }
+  }, [atmosphere]);
+
   return (
     <Canvas shadows camera={{ position: [0, 2, 9], fov: 45 }}>
       <ResponsiveCamera />
 
-      {/* Background - Lighter Moonlight Blue */}
-      <color attach="background" args={['#1a1d29']} />
-      {/* Fog - much lighter and further back */}
-      <fog attach="fog" args={['#1a1d29', 12, 45]} />
+      {/* Dynamic Background */}
+      <color attach="background" args={[settings.bg]} />
+      <fog attach="fog" args={[settings.fog, 12, 45]} />
 
-      {/* --- Lighting Overhaul (High Visibility) --- */}
+      {/* --- Dynamic Lighting --- */}
 
-      {/* Ambient: Strong base illumination so nothing is pitch black */}
-      <ambientLight intensity={1.5} color="#c7d2fe" />
+      {/* Ambient */}
+      <ambientLight intensity={1.5} color={settings.ambient} />
 
-      {/* Main Spot (Moonlight): Very Bright */}
+      {/* Main Spot (Moonlight) */}
       <spotLight
         position={[-5, 10, 10]}
         angle={0.6}
         penumbra={0.5}
-        intensity={4}
-        color="#a5b4fc"
+        intensity={settings.spotIntensity}
+        color={settings.spot}
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0001}
       />
 
-      {/* Fill Light (Warm): Hits the face/front directly */}
+      {/* Fill Light (Warm) */}
       <pointLight position={[2, 3, 5]} intensity={2} color="#e0e7ff" />
 
-      {/* Rim Light (Cyan): Pop the silhouette against the dark background */}
-      <spotLight position={[0, 5, -8]} intensity={5} color="#22d3ee" />
+      {/* Rim Light (Pop) */}
+      <spotLight position={[0, 5, -8]} intensity={5} color={settings.rim} />
 
       {/* Ground illumination */}
       <directionalLight position={[0, -5, 0]} intensity={1} color="#334155" />
 
       {/* --- Environment --- */}
       <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={0.5} />
-      <Sparkles count={100} scale={15} size={4} speed={0.4} opacity={0.5} color="#818cf8" />
-      <Cloud position={[-4, -2, -5]} speed={0.2} opacity={0.1} color="#94a3b8" />
-      <Cloud position={[4, 2, -5]} speed={0.2} opacity={0.1} color="#94a3b8" />
+      <Sparkles count={100} scale={15} size={4} speed={0.4} opacity={0.5} color={atmosphere === 'RED_FOG' ? '#ff0000' : '#818cf8'} />
+      <Cloud position={[-4, -2, -5]} speed={0.2} opacity={0.1} color={settings.fog} />
+      <Cloud position={[4, 2, -5]} speed={0.2} opacity={0.1} color={settings.fog} />
 
       <group position={[0, -1, 0]}>
         <Gallows />
         <HangmanFigure wrongGuesses={wrongGuesses} isDead={isLost} isWon={isWon} />
       </group>
 
-      {/* Floor - Slate Blue, faintly reflective */}
+      {/* Floor */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -3, 0]} receiveShadow>
         <planeGeometry args={[100, 100]} />
-        <meshStandardMaterial color="#1e293b" roughness={0.5} />
+        <meshStandardMaterial color={atmosphere === 'DARKNESS' ? '#050505' : "#1e293b"} roughness={0.5} />
       </mesh>
 
       <OrbitControls
@@ -398,7 +437,7 @@ export const GameScene: React.FC<SceneProps> = ({ wrongGuesses, isWon, isLost })
         minPolarAngle={Math.PI / 3}
         maxPolarAngle={Math.PI / 1.8}
         minDistance={6}
-        maxDistance={20} // Increased max distance for mobile
+        maxDistance={20}
       />
     </Canvas>
   );

@@ -77,3 +77,22 @@ export const generateGlitchText = async (): Promise<string> => {
         return "SYSTEM FAILURE... 0xDEADBEEF";
     }
 };
+
+// --- 4. Loop of Rituals ---
+export const getRitualPhrase = async (): Promise<string> => {
+    const prompt = `
+  Generate a short, poetic, creepy "incantation" phrase for a player to chant (type).
+  Length: 5-8 words.
+  Theme: Summoning knowledge, blood sacrifice, darkness.
+  Example: "I offer my breath to the void"
+  
+  Output text only. No quotes.
+  `;
+
+    try {
+        const result = await model.generateContent(prompt);
+        return result.response.text().trim().replace(/['"]/g, '');
+    } catch (e) {
+        return "I summon the truth from shadows";
+    }
+};
