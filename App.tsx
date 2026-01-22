@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { GameScene } from './components/Scene';
+import { Lobby } from './components/game/Lobby';
+import { GameOver } from './components/game/GameOver';
+import { GameSceneOverlay } from './components/game/GameSceneOverlay';
+import { GameSidebar } from './components/game/GameSidebar';
 import { generateWord, generateTournamentBatch } from './services/wordGenerator';
 import { GameStatus, WordData, Player, AtmosphereType } from './types';
 import { Play, RotateCcw, HelpCircle, Loader2, Trophy, Skull, Users, Copy, Link, User, ChevronLeft, ChevronRight, X, Eye, Scroll } from 'lucide-react';
@@ -95,13 +99,27 @@ export default function App() {
 
   const [activeDebuffs, setActiveDebuffs] = useState<('FOG' | 'SCRAMBLE')[]>([]);
   const [scrambleSeed, setScrambleSeed] = useState(0); // Triggers re-shuffle
-  const [spellToCast, setSpellToCast] = useState<'FOG' | 'SCRAMBLE' | 'JUMPSCARE' | null>(null); // For targeting mode
-  const [lastSpellCastTime, setLastSpellCastTime] = useState(0); // Cooldown Tracker
+  // const [spellToCast, setSpellToCast] = useState<'FOG' | 'SCRAMBLE' | 'JUMPSCARE' | null>(null); // MOVED TO SIDEBAR
+  // const [lastSpellCastTime, setLastSpellCastTime] = useState(0); // MOVED TO SIDEBAR
   // Spectator State
   const [spectatingTargetId, setSpectatingTargetId] = useState<string | null>(null);
   const [autoNextRoundCountdown, setAutoNextRoundCountdown] = useState<number | null>(null);
   // Free Winner Powers (Tracking usage)
   const [winnerPowersUsed, setWinnerPowersUsed] = useState<{ FOG: boolean, SCRAMBLE: boolean, JUMPSCARE: boolean }>({ FOG: false, SCRAMBLE: false, JUMPSCARE: false });
+
+  const handlePerformSpellAction = (spell: 'FOG' | 'SCRAMBLE' | 'JUMPSCARE', targetId: string) => {
+    const cost = spell === 'FOG' ? 20 : spell === 'SCRAMBLE' ? 20 : 0;
+    if (spell !== 'JUMPSCARE') {
+      setCurseEnergy(prev => Math.max(0, prev - cost));
+    }
+    castSpell(spell, targetId);
+
+    if (spell === 'JUMPSCARE') {
+      setHasScared(true);
+      setTotalScaresUsed(prev => prev + 1);
+    }
+    soundManager.playWin();
+  };
 
 
 
@@ -724,66 +742,7 @@ export default function App() {
     }
   };
 
-  const onCastSpell = (spell: 'FOG' | 'SCRAMBLE' | 'JUMPSCARE') => {
-    // Cooldown Check (Balance Fix)
-    if (Date.now() - lastSpellCastTime < 10000) {
-      soundManager.playWrong();
-      setGameLog(prev => [{
-        id: Date.now(),
-        content: <span className="text-orange-500 font-bold">SPELL COOLDOWN! (Wait 10s)</span>
-      }, ...prev]);
-      return;
-    }
 
-    const cost = spell === 'FOG' ? 20 : spell === 'SCRAMBLE' ? 20 : 0;
-
-    // Check constraints
-    if (spell !== 'JUMPSCARE' && curseEnergy < cost) {
-      soundManager.playWrong();
-      setGameLog(prev => [{
-        id: Date.now(),
-        content: <span className="text-red-500 font-bold shake">NOT ENOUGH ENERGY! ({cost} CP)</span>
-      }, ...prev]);
-      return;
-    }
-
-    // Jumpscare Restriction: Only if YOU WON? Or cost?
-    // User request implies manual selection. Letting it be free/selectable for now or check 'isWon'?
-    // Screenshot said "WIN". Usually means "Only usable when you won".
-    if (spell === 'JUMPSCARE' && status !== GameStatus.WON) {
-      soundManager.playWrong();
-      setGameLog(prev => [{
-        id: Date.now(),
-        content: <span className="text-red-500 font-bold">MUST WIN TO JUMPSCARE!</span>
-      }, ...prev]);
-      return;
-    }
-
-    setSpellToCast(spell); // Enter selection mode
-  };
-
-  const handlePlayerSelect = (targetId: string) => {
-    if (!spellToCast) return;
-    const cost = spellToCast === 'FOG' ? 20 : spellToCast === 'SCRAMBLE' ? 20 : 0;
-
-    // deduct points
-    if (spellToCast !== 'JUMPSCARE') {
-      setCurseEnergy(prev => Math.max(0, prev - cost));
-    }
-
-    castSpell(spellToCast, targetId);
-    // setCurseEnergy(0); // No longer reset to 0
-    setSpellToCast(null); // Exit selection mode
-    setLastSpellCastTime(Date.now()); // Start Cooldown
-    soundManager.playWin(); // temporary sound for casting
-    soundManager.playWin(); // temporary sound for casting
-    if (spellToCast === 'JUMPSCARE') {
-      setHasScared(true);
-      setTotalScaresUsed(prev => prev + 1);
-    }
-    // Close mobile list if open
-    setShowMobileList(false);
-  };
 
   // Keyboard
   useEffect(() => {
@@ -1016,119 +975,24 @@ export default function App() {
   // Active Lobby / Waiting Room
   if ((gameMode === 'LOBBY_HOST' || gameMode === 'LOBBY_JOIN') && status === GameStatus.IDLE) {
     return (
-      <div className="w-full h-screen bg-slate-950/50 flex flex-col md:flex-row gap-4 p-4 overflow-y-auto">
-        {/* Background Shader */}
-        <ShaderBackground
-          active={true}
-          mood="anticipation"
-        />
-        {/* Left: Setup Panel */}
-        <div className="flex-1 flex flex-col items-center justify-center bg-black/50 border border-slate-800 rounded relative min-h-[300px]">
-          <button onClick={() => setGameMode('MENU')} className="absolute top-4 left-4 text-slate-500 hover:text-white">Exit</button>
-
-          <h2 className="text-3xl font-horror mb-6 text-red-500">LOBBY</h2>
-
-          {gameMode === 'LOBBY_HOST' ? (
-            <div className="text-center w-full max-w-md">
-              <p className="text-slate-400 mb-2">Ritual Code:</p>
-              {roomId ? (
-                <div className="flex items-center gap-2 bg-slate-900 p-4 rounded border border-slate-600 mb-6">
-                  <code className="text-2xl text-yellow-500 tracking-wider flex-1 overflow-hidden text-ellipsis">{roomId}</code>
-                  <button onClick={copyToClipboard} className="p-2 hover:bg-slate-800 text-slate-400 hover:text-white"><Copy size={20} /></button>
-                </div>
-              ) : <Loader2 className="animate-spin mx-auto mb-6" />}
-
-              {/* Difficulty Selection */}
-              <div className="w-full">
-                <p className="text-slate-400 mb-2 font-bold uppercase tracking-wider text-xs">Select Intensity to Begin</p>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onClick={() => handleStartGame('Easy')}
-                    disabled={!!loadingDifficulty || players.length < 1}
-                    className="py-4 bg-green-950/40 hover:bg-green-600 border border-green-800 hover:border-green-400 rounded font-bold text-xs md:text-sm uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
-                  >
-                    {loadingDifficulty === 'Easy' ? <Loader2 className="animate-spin mx-auto" /> : <span className="group-hover:text-white text-green-400">Initiate</span>}
-                  </button>
-                  <button
-                    onClick={() => handleStartGame('Medium')}
-                    disabled={!!loadingDifficulty || players.length < 1}
-                    className="py-4 bg-yellow-950/40 hover:bg-yellow-600 border border-yellow-800 hover:border-yellow-400 rounded font-bold text-xs md:text-sm uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
-                  >
-                    {loadingDifficulty === 'Medium' ? <Loader2 className="animate-spin mx-auto" /> : <span className="group-hover:text-white text-yellow-400">Summon</span>}
-                  </button>
-                  <button
-                    onClick={() => handleStartGame('Hard')}
-                    disabled={!!loadingDifficulty || players.length < 1}
-                    className="py-4 bg-red-950/40 hover:bg-red-600 border border-red-800 hover:border-red-400 rounded font-bold text-xs md:text-sm uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
-                  >
-                    {loadingDifficulty === 'Hard' ? <Loader2 className="animate-spin mx-auto" /> : <span className="group-hover:text-white text-red-400">Curse</span>}
-                  </button>
-                </div>
-              </div>
-
-              {/* Error Display */}
-              {gameLog.length > 0 && gameLog[0].content && (
-                <div className="mt-4 p-4 bg-red-950/50 border-2 border-red-600 rounded-lg animate-pulse">
-                  {gameLog[0].content}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="text-center w-full max-w-md">
-              {connectionStatus === 'CONNECTED' && players.length > 0 ? (
-                <div className="animate-pulse text-green-500 font-bold text-xl mb-4">CONNECTED TO HOST</div>
-              ) : (
-                <>
-                  <p className="text-slate-400 mb-2">Enter Host Code:</p>
-                  <div className="flex gap-2 mb-4">
-                    <input
-                      value={joinInputId}
-                      onChange={e => setJoinInputId(e.target.value)}
-                      className="flex-1 bg-slate-900 border border-slate-600 p-3 rounded text-white"
-                      placeholder="Paste Code..."
-                    />
-                    <button
-                      onClick={() => joinLobby(joinInputId, username)}
-                      disabled={connectionStatus === 'CONNECTING' || !joinInputId}
-                      className="bg-blue-600 px-6 rounded font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {connectionStatus === 'CONNECTING' ? <Loader2 className="animate-spin" /> : 'JOIN'}
-                    </button>
-                  </div>
-                  {connectionStatus === 'DISCONNECTED' && joinInputId && (
-                    <p className="text-red-500 text-xs mt-2">
-                      {/* Only show if we tried and failed - simpler heuristic might be needed or just show status */}
-                    </p>
-                  )}
-                  {/* Connection Help */}
-                  <p className="text-xs text-slate-600 mt-2">
-                    Stuck connecting? Ensure Host and you are on the same version/server.
-                  </p>
-                </>
-              )}
-              <p className="text-slate-500">
-                {players.length > 0 ? "Waiting for host to start..." : "Enter code to join..."}
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Right: Roster */}
-        <div className="w-full md:w-80">
-          <PlayerList players={players} myId={myId} />
-        </div>
-      </div>
+      <Lobby
+        gameMode={gameMode}
+        setGameMode={setGameMode}
+        roomId={roomId}
+        players={players}
+        myId={myId}
+        onStartGame={handleStartGame}
+        joinLobby={joinLobby}
+        loadingDifficulty={loadingDifficulty}
+        connectionStatus={connectionStatus}
+        gameLog={gameLog}
+        username={username}
+      />
     );
   }
 
   // --- Game Over / Winner Screen (After Round 5) ---
   if (showGameOver && gameMode !== 'SINGLE') {
-    // Calculate leaderboard based on Time (Lowest is Best)
-    // Filter out those with 0 time (if any bug) or treat them as last?
-    // Assuming everyone played.
-    const sortedPlayers = [...players].sort((a, b) => (a.totalTime || 0) - (b.totalTime || 0));
-    const top3 = sortedPlayers.slice(0, 3);
-
     const handleNewGame = () => {
       // Reset everything and go back to lobby
       setShowGameOver(false);
@@ -1142,93 +1006,12 @@ export default function App() {
     };
 
     return (
-      <div className="relative w-full h-screen bg-gradient-to-br from-slate-950 via-red-950/20 to-slate-950 overflow-hidden flex items-center justify-center">
-        <div className="absolute inset-0 z-0 opacity-30">
-          <GameScene wrongGuesses={0} isWon={true} isLost={false} />
-        </div>
-
-        <div className="relative z-10 max-w-2xl w-full mx-4 bg-black/90 backdrop-blur-xl border-2 border-red-600 rounded-lg shadow-2xl shadow-red-600/50 p-8">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <h1 className="text-6xl font-horror text-red-600 tracking-wider mb-2 drop-shadow-[0_0_20px_rgba(220,38,38,0.8)]">
-              TOURNAMENT OVER
-            </h1>
-            <p className="text-slate-400 text-lg">5 Rounds Complete</p>
-          </div>
-
-          {/* Leaderboard */}
-          <div className="space-y-4 mb-8">
-            {top3.map((player, index) => {
-              const medals = ['🥇', '🥈', '🥉'];
-              const colors = ['text-yellow-400', 'text-slate-300', 'text-orange-400'];
-              const bgColors = ['bg-yellow-950/30', 'bg-slate-900/30', 'bg-orange-950/30'];
-              const borderColors = ['border-yellow-600/50', 'border-slate-500/50', 'border-orange-600/50'];
-
-              return (
-                <div
-                  key={player.id}
-                  className={clsx(
-                    "flex items-center justify-between p-4 rounded-lg border-2 transition-all",
-                    bgColors[index],
-                    borderColors[index],
-                    index === 0 && "ring-2 ring-yellow-500/50 scale-105"
-                  )}
-                >
-                  <div className="flex items-center gap-4">
-                    <span className="text-4xl">{medals[index]}</span>
-                    <div>
-                      <div className={clsx("text-2xl font-horror", colors[index])}>
-                        {player.name}
-                      </div>
-                      <div className="text-xs text-slate-500 uppercase tracking-wider">
-                        {index === 0 ? 'CHAMPION' : index === 1 ? 'RUNNER-UP' : '3RD PLACE'}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className={clsx("text-2xl font-horror drop-shadow-[0_2px_5px_rgba(0,0,0,0.5)]", colors[index])}>
-                      {((player.totalTime || 0) / 1000).toFixed(2)}s
-                    </div>
-                    <div className="text-xs text-slate-500 uppercase tracking-widest font-bold">TOTAL TIME</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Other Players */}
-          {sortedPlayers.length > 3 && (
-            <div className="mb-6 border-t border-slate-800 pt-4">
-              <h3 className="text-slate-500 text-sm uppercase tracking-wider mb-2">Other Players</h3>
-              <div className="space-y-1">
-                {sortedPlayers.slice(3).map((player, index) => (
-                  <div key={player.id} className="flex justify-between text-sm text-slate-400 py-1">
-                    <span>{index + 4}. {player.name}</span>
-                    <span>{player.roundScore || 0} CP</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* New Game Button (Host Only) */}
-          {amIHost && (
-            <button
-              onClick={handleNewGame}
-              className="w-full py-4 bg-gradient-to-r from-red-900 to-red-700 hover:from-red-800 hover:to-red-600 text-white font-bold text-xl rounded-lg flex items-center justify-center gap-2 transition-all shadow-lg shadow-red-900/50 hover:scale-105"
-            >
-              <Play size={24} /> NEW TOURNAMENT
-            </button>
-          )}
-
-          {/* Non-host message */}
-          {!amIHost && (
-            <div className="text-center text-slate-500 text-sm uppercase tracking-widest animate-pulse">
-              Waiting for host to start new tournament...
-            </div>
-          )}
-        </div>
-      </div>
+      <GameOver
+        players={players}
+        myId={myId}
+        amIHost={amIHost}
+        onNewGame={handleNewGame}
+      />
     );
   }
 
@@ -1239,510 +1022,56 @@ export default function App() {
       {/* 3D Scene Area */}
       {/* Mobile: Top 40%, Desktop: Flex Grow (Remaining Space) */}
       <div className="relative w-full h-[40vh] lg:h-full lg:flex-1 bg-black z-0 order-1 shadow-2xl lg:shadow-none">
-        {/* VISUAL RIDDLE OVERLAY */}
-        {/* VISUAL RIDDLE REMOVED */}
-
-        {/* JUMPSCARE OVERLAY */}
-        {showJumpscare && (
-          <div className="absolute inset-0 z-[100] bg-black flex items-center justify-center">
-            <video
-              src={currentJumpscareVideo}
-              autoPlay
-              className="w-full h-full object-cover"
-              onEnded={() => setShowJumpscare(false)}
-            />
-          </div>
-        )}
+        <GameSceneOverlay
+          showJumpscare={showJumpscare}
+          currentJumpscareVideo={currentJumpscareVideo}
+          setShowJumpscare={setShowJumpscare}
+          autoNextRoundCountdown={autoNextRoundCountdown}
+          round={round}
+          mySpectators={players.filter(p => p.spectatingId === myId)}
+          gameLog={gameLog}
+          showHintUnlock={showHintUnlock}
+        />
 
         <GameScene isWon={status === GameStatus.WON || (!!targetPlayer && targetPlayer.status === 'WON')} isLost={status === GameStatus.LOST || (!!targetPlayer && targetPlayer.status === 'LOST')} wrongGuesses={displayWrongGuesses} />
-
-        {/* Spectator Overlay */}
-
-
-        {/* Next Round Countdown Overlay */}
-        {autoNextRoundCountdown !== null && (
-          <div className="absolute inset-0 z-[50] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="text-center">
-              <h2 className="text-4xl font-horror text-red-500 mb-2">ROUND OVER</h2>
-              <p className="text-slate-300 mb-4">Prepare for the next ritual...</p>
-              <div className="text-6xl font-bold text-white animate-ping">{autoNextRoundCountdown}</div>
-            </div>
-          </div>
-        )
-        }
-
-        {/* Round Indicator (Top Center) */}
-        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[20] flex flex-col items-center pointer-events-none select-none">
-          <div className="text-[10px] text-red-500 font-bold tracking-[0.3em] uppercase opacity-80 mb-[-5px]">CURRENT</div>
-          <div className="text-4xl md:text-5xl font-horror text-red-600 tracking-wider drop-shadow-[0_0_15px_rgba(220,38,38,0.8)] animate-pulse">
-            ROUND {round}
-          </div>
-          {mySpectators.length > 0 && (
-            <div className="flex items-center gap-2 text-xs text-red-400 mt-2 animate-pulse bg-black/40 px-3 py-1 rounded-full border border-red-900/30">
-              <span>👁️</span> {mySpectators.length} watching you
-            </div>
-          )}
-
-          {/* SPIRIT BOX REMOVED */}
-        </div>
-
-        {/* Persistent Game Log (Top Left of 3D Scene) */}
-        <div className="absolute top-4 left-4 z-[10] w-full max-w-md pointer-events-none flex flex-col gap-1">
-          {gameLog.map(item => (
-            <div key={item.id} className="font-horror text-sm tracking-widest drop-shadow-[0_2px_1px_rgba(0,0,0,1)] animate-in slide-in-from-left-4 fade-in duration-300">
-              {item.content}
-            </div>
-          ))}
-        </div>
-
-        {/* Hint Unlock Notification */}
-        {showHintUnlock && (
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] p-4 bg-red-900/80 border border-red-600 rounded-lg shadow-xl animate-in fade-in zoom-in duration-300 text-center">
-            <p className="font-horror text-3xl text-red-100 drop-shadow-lg">HINT UNLOCKED!</p>
-            <p className="text-red-300 text-sm mt-1">A new secret has been revealed...</p>
-          </div>
-        )}
 
         {/* Mobile-Only Overlays that MUST be on top of scene (like toasts) could go here, but avoiding for now to keep scene clean */}
       </div>
 
-      {/* UI Sidebar / Control Center */}
-      {/* Mobile: Bottom 60%, Desktop: Fixed 450px Right Sidebar */}
-      <div className="relative w-full h-[60vh] lg:h-full lg:w-[450px] lg:shrink-0 bg-slate-900 border-l border-slate-800 flex flex-col order-2 z-10 shadow-2xl">
-
-        {/* Scrollable Content Area */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 flex flex-col">
-
-          {/* Header */}
-          <div className="flex justify-between items-start mb-6">
-            <div>
-              <h1 className="text-3xl font-horror text-red-600 tracking-wider">
-                CURSED<span className="text-slate-100">MAN</span>
-              </h1>
-              <div className="flex items-center gap-2">
-                {gameMode !== 'SINGLE' && (
-                  <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
-                    <User size={12} /> <span className="uppercase tracking-wider font-bold">{username}</span>
-                    <User size={12} /> <span className="uppercase tracking-wider font-bold">{username}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-            {/* Desktop: Toggle Player List if needed, or just show it inline? Let's show inline at bottom */}
-            {gameMode !== 'SINGLE' && (
-              <div className="flex items-center gap-2">
-                <div className="bg-slate-800 px-2 py-1 rounded text-xs text-slate-300 flex items-center gap-1">
-                  <Users size={12} /> {players.length}
-                </div>
-                {amIHost && status === GameStatus.IDLE && (
-                  <button
-                    onClick={spawnBot}
-                    className="px-2 py-1 bg-purple-900/50 hover:bg-purple-800 border border-purple-500/30 rounded text-[10px] text-purple-200 uppercase font-bold tracking-wider transition-colors"
-                  >
-                    + ADD BOT
-                  </button>
-                )}
-              </div>
-            )}
-            <button
-              onClick={() => setShowRules(true)}
-              className="ml-2 p-2 bg-slate-800 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors"
-              title="Rules & Powers"
-            >
-              <HelpCircle size={18} />
-            </button>
-          </div>
-
-          <RulesModal isOpen={showRules} onClose={() => setShowRules(false)} />
-
-          {/* Word Display Area */}
-          <div className="mb-8 flex flex-col items-center justify-center min-h-[120px] bg-black/20 rounded-lg p-4 border border-slate-800/50">
-            {loadingDifficulty ? (
-              <div className="flex flex-col items-center animate-pulse gap-2">
-                <Loader2 size={32} className="text-red-700 animate-spin" />
-                <span className="font-horror text-xl text-red-800">SUMMONING...</span>
-              </div>
-            ) : (
-              <>
-                {/* Word Stats Bar */}
-                <div className="w-full flex justify-between items-center mb-4 border-b border-slate-800 pb-2">
-                  <span className={clsx(
-                    "px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest border border-dashed",
-                    wordData?.difficulty === 'Hard' ? 'border-red-800 text-red-500 bg-red-950/30' :
-                      wordData?.difficulty === 'Medium' ? 'border-yellow-800 text-yellow-500 bg-yellow-950/30' : 'border-green-800 text-green-500 bg-green-950/30'
-                  )}>
-                    {wordData?.difficulty || '...'}
-                  </span>
-                </div>
-
-                {/* The Letters */}
-                <div className="flex flex-wrap justify-center gap-2">
-                  {wordData?.word.split('').map((char, idx) => {
-                    if (char === ' ') return <div key={idx} className="w-3" />;
-                    const isGuessed = displayGuessedLetters.includes(char) || status === GameStatus.LOST || (targetPlayer?.status === 'LOST');
-                    return (
-                      <span
-                        key={idx}
-                        className={clsx(
-                          "w-8 h-10 border-b-2 flex items-center justify-center text-2xl font-horror transition-all duration-300",
-                          isGuessed ? "border-slate-500 text-red-100" : "border-slate-800 text-transparent",
-                          (status === GameStatus.LOST || (targetPlayer?.status === 'LOST')) && !displayGuessedLetters.includes(char) && "text-red-600 border-red-900"
-                        )}
-                      >
-
-                        {isGuessed ? char : '_'}
-                      </span>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Hint Display */}
-          <div className="mb-6">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-slate-500 text-xs uppercase font-bold tracking-widest">Ritual Clues</h3>
-              {/* INVOKE VISION REMOVED */}
-            </div>
-
-            <div className="space-y-2">
-              {wordData?.hints ? (
-                // Multi-hint system with Ritual Locking
-                Array.from({ length: 5 }).map((_, i) => {
-                  const isUnlocked = i + 1 <= unlockedHints;
-                  const isRevealed = i + 1 <= revealedHints;
-                  if (!isUnlocked) return null; // Don't show future hints at all
-
-                  return (
-                    <div key={i} className="bg-gradient-to-r from-purple-950/40 to-slate-900/40 p-3 rounded-lg border border-purple-500/30 animate-in slide-in-from-left">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">Hint {i + 1}</span>
-                        {i === 0 && <span className="text-[10px] text-slate-500">(Free)</span>}
-                      </div>
-
-                      {isRevealed || i === 0 ? (
-                        <p className="text-slate-300 text-sm italic leading-relaxed">"{wordData.hints![i]}"</p>
-                      ) : (
-                        <div className="flex flex-col gap-2">
-                          <p className="text-slate-500 text-sm italic blur-sm select-none">"The secrets of the void are hidden..."</p>
-                          <button
-                            onClick={async () => {
-                              const phrase = await getRitualPhrase();
-                              setRitualPhrase(phrase);
-                              setUserRitualInput('');
-                              setShowRitualInput(true);
-                            }}
-                            className="w-full py-1 bg-purple-900/20 hover:bg-purple-900/50 border border-purple-500/50 text-purple-300 text-xs uppercase font-bold transition-all flex items-center justify-center gap-2"
-                          >
-                            <Scroll size={12} /> Perform Ritual to Reveal
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              ) : (
-                // Fallback
-                wordData?.hint && (
-                  <div className="bg-gradient-to-r from-purple-950/40 to-slate-900/40 p-3 rounded-lg border border-purple-500/30">
-                    <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">Hint</span>
-                    <p className="text-slate-300 text-sm italic mt-1">"{wordData.hint}"</p>
-                  </div>
-                )
-              )}
-            </div>
-
-            {/* Team Sacrifice Progress */}
-            {gameMode !== 'SINGLE' && wordData?.hints && unlockedHints < 5 && (
-              <div className="mt-3 bg-slate-900/30 p-2 rounded border border-slate-700/50">
-                <div className="flex justify-between text-xs text-slate-400 mb-1">
-                  <span>Team Sacrifice</span>
-                  <span>{Math.floor((players.reduce((s, p) => s + p.mistakes, 0) / (players.length * 6)) * 100)}%</span>
-                </div>
-                <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-purple-600 to-red-600 transition-all duration-500"
-                    style={{ width: `${(players.reduce((s, p) => s + p.mistakes, 0) / (players.length * 6)) * 100}%` }}
-                  />
-                </div>
-                <p className="text-[10px] text-slate-500 text-center mt-1">
-                  Next hint at {unlockedHints === 1 ? '20' : unlockedHints === 2 ? '40' : unlockedHints === 3 ? '60' : '80'}% • {unlockedHints}/5 hints
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* Status Messages */}
-          <div className="h-8 flex items-center justify-center mb-6">
-            {status === GameStatus.WON && <div className="text-green-500 text-xl font-horror flex items-center gap-2 animate-bounce"><Trophy size={20} /> SOUL SAVED</div>}
-            {status === GameStatus.LOST && <div className="text-red-600 text-xl font-horror flex items-center gap-2 animate-pulse"><Skull size={20} /> CONSUMED</div>}
-          </div>
-
-          {/* Controls Section (KEYBOARD & SABOTAGE) */}
-          <div className={clsx(
-            "relative transition-all duration-500 rounded-lg p-2 md:p-4 border border-slate-800 bg-black/40",
-            activeDebuffs.includes('FOG') && "blur-sm grayscale opacity-50 pointer-events-none border-red-900/50" // Precise Fog
-          )}>
-            {/* Fog Overlay Message */}
-            {activeDebuffs.includes('FOG') && (
-              <div className="absolute inset-0 z-50 flex items-center justify-center text-red-600 font-horror text-4xl animate-pulse tracking-widest drop-shadow-lg">
-                BLINDED!
-              </div>
-            )}
-
-            {/* Sabotage Shop */}
-            {gameMode !== 'SINGLE' && (
-              <div className="mb-4 space-y-2">
-                {/* Main Powers Row */}
-                <div className="flex items-center justify-between gap-3 bg-slate-900/50 p-2 rounded border border-slate-700/50">
-                  <div className="flex-1 flex items-center gap-2">
-                    <div className="text-xs text-slate-400 uppercase font-bold tracking-widest">
-                      CURSE POINTS
-                    </div>
-                    <div className="text-xl font-horror text-purple-400 animate-pulse tracking-widest shadow-purple-500/50 drop-shadow-md">
-                      {curseEnergy}
-                    </div>
-                  </div>
-                  <div className="flex gap-1">
-                    <button
-                      disabled={curseEnergy < 15}
-                      onClick={() => onCastSpell('FOG')}
-                      className="bg-purple-900/30 hover:bg-purple-800 disabled:opacity-30 border border-purple-500/50 text-purple-300 text-xs uppercase font-bold px-4 py-3 rounded transition-colors flex flex-col items-center leading-tight min-w-[70px]"
-                    >
-                      <span>FOG</span>
-                      <span className="text-[10px] opacity-70">20pts</span>
-                    </button>
-                    <button
-                      disabled={curseEnergy < 20}
-                      onClick={() => onCastSpell('SCRAMBLE')}
-                      className="bg-orange-900/30 hover:bg-orange-800 disabled:opacity-30 border border-orange-500/50 text-orange-300 text-xs uppercase font-bold px-4 py-3 rounded transition-colors flex flex-col items-center leading-tight min-w-[70px]"
-                    >
-                      <span>MIX</span>
-                      <span className="text-[10px] opacity-70">20pts</span>
-                    </button>
-
-                    <button
-                      disabled={curseEnergy < 40 || wrongGuesses === 0}
-                      onClick={onSoulMend}
-                      className="bg-green-900/30 hover:bg-green-800 disabled:opacity-30 border border-green-500/50 text-green-300 text-xs uppercase font-bold px-4 py-3 rounded transition-colors flex flex-col items-center leading-tight min-w-[70px]"
-                    >
-                      <span>HEAL</span>
-                      <span className="text-[10px] opacity-70">40pts</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Gemini Powers Row */}
-                <div className="flex gap-2">
-                  <button
-                    disabled={curseEnergy < 15}
-                    onClick={handleOracle}
-                    className="flex-1 bg-cyan-900/30 hover:bg-cyan-800 disabled:opacity-30 border border-cyan-500/50 text-cyan-300 text-xs uppercase font-bold py-2 rounded transition-colors flex items-center justify-center gap-2"
-                    title="Ask the AI Oracle for a hint"
-                  >
-                    <span>🔮 ORACLE</span>
-                    <span className="text-[10px] opacity-70">15pts</span>
-                  </button>
-                  <button
-                    disabled={curseEnergy < 10}
-                    onClick={handleRoast}
-                    className="flex-1 bg-red-900/30 hover:bg-red-800 disabled:opacity-30 border border-red-500/50 text-red-300 text-xs uppercase font-bold py-2 rounded transition-colors flex items-center justify-center gap-2"
-                    title="AI Roast an opponent"
-                  >
-                    <span>🔥 ROAST</span>
-                    <span className="text-[10px] opacity-70">10pts</span>
-                  </button>
-                  <button
-                    disabled={curseEnergy < 25}
-                    onClick={handleGlitch}
-                    className="flex-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 border border-slate-500 text-slate-300 text-xs uppercase font-bold py-2 rounded transition-colors flex items-center justify-center gap-2"
-                    title="Glitch the reality (Narrative Chaos)"
-                  >
-                    <span>👾 GLITCH</span>
-                    <span className="text-[10px] opacity-70">25pts</span>
-                  </button>
-                </div>
-
-                {/* Scare Button - Separate Row Below */}
-                {status === GameStatus.WON && (
-                  <button
-                    disabled={hasScared}
-                    onClick={() => onCastSpell('JUMPSCARE')}
-                    className={clsx(
-                      "w-full border-2 text-sm uppercase font-bold px-4 py-3 rounded transition-colors flex items-center justify-center gap-2",
-                      hasScared
-                        ? "bg-slate-900 border-slate-700 text-slate-500 cursor-not-allowed opacity-50"
-                        : "bg-red-950/80 hover:bg-red-900 border-red-600 text-red-300 hover:text-red-100 animate-pulse"
-                    )}
-                  >
-                    {hasScared ? "ALREADY SCARED" : "💀 JUMPSCARE"}
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Keyboard */}
-            <div className="grid grid-cols-7 gap-1">
-              {currentAlphabet.map(letter => {
-                const isGuessed = guessedLetters.includes(letter);
-                const isCorrect = wordData?.word.includes(letter);
-                return (
-                  <button
-                    key={letter}
-                    onClick={() => handleGuess(letter)}
-                    disabled={isGuessed || status !== GameStatus.PLAYING}
-                    className={clsx(
-                      "aspect-square rounded flex items-center justify-center font-bold text-sm border transition-all active:scale-95 touch-manipulation",
-                      isGuessed
-                        ? (isCorrect ? "bg-green-900/40 text-green-500 border-green-800" : "bg-slate-800/50 text-slate-600 border-transparent")
-                        : "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white"
-                    )}
-                  >
-                    {letter}
-                  </button>
-                )
-              })}
-            </div>
-
-
-          </div>
-
-          {/* Restart Button - HIDDEN for Host in Multiplayer if not everyone finished (controlled by auto-logic) */}
-          {/* Actually, Host can force start if they really want? But user asked "Wait for all". Let's hide it or disable it. */}
-          {
-            (gameMode === 'SINGLE' || (amIHost && players.every(p => p.status !== 'PLAYING'))) && status !== GameStatus.IDLE && status !== GameStatus.PLAYING && (
-              <button
-                onClick={handleStartGame}
-                // Disable if countdown is running to prevent double click? Or let it override?
-                className="mt-6 w-full py-3 bg-red-900 hover:bg-red-800 text-white font-bold rounded flex items-center justify-center gap-2 transition-colors border-t border-red-700"
-              >
-                <RotateCcw size={18} /> {status === GameStatus.WON || status === GameStatus.LOST ? `START ROUND ${round + 1}` : 'RESTART RITUAL'}
-              </button>
-            )
-          }
-
-
-          {/* Spectator Controls (If dead/won) */}
-          {
-            (status === GameStatus.WON || status === GameStatus.LOST) && !spectatingTargetId && gameMode !== 'SINGLE' && (
-              <div className="mt-4 p-4 bg-slate-900/80 border border-slate-700 rounded">
-                <h3 className="text-slate-400 text-xs uppercase font-bold mb-2">Spectate Players</h3>
-                <div className="flex flex-wrap gap-2">
-                  {players.filter(p => p.id !== myId && p.status === 'PLAYING').map(p => (
-                    <button
-                      key={p.id}
-                      onClick={() => { setSpectatingTargetId(p.id); setSpectating(p.id); }}
-                      className="text-xs bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded flex items-center gap-2 border border-slate-600"
-                    >
-                      <User size={12} /> {p.name}
-                    </button>
-                  ))}
-                  {players.filter(p => p.id !== myId && p.status === 'PLAYING').length === 0 && (
-                    <span className="text-slate-600 text-xs italic">No active players to watch.</span>
-                  )}
-                </div>
-              </div>
-            )
-          }
-
-          {
-            gameMode !== 'SINGLE' && !amIHost && status !== GameStatus.IDLE && status !== GameStatus.PLAYING && (
-              <div className="mt-6 text-center text-slate-500 text-xs uppercase tracking-widest animate-pulse">
-                {autoNextRoundCountdown !== null ? `Starting Round ${round + 1} in ${autoNextRoundCountdown}...` : "Waiting for all players..."}
-              </div>
-            )
-          }
-
-          {/* Player List (Inline for Desktop Sidebar) */}
-          {/* We can put it in a collapsable or just below if there's space. Let's make it a toggle or separate tab? 
-                 Actually, just putting it at the bottom is safe since it scroll. */}
-          {/* RITUAL SELECTION (Difficulty) */}
-          {
-            (gameMode === 'SINGLE' || (amIHost && players.every(p => p.status !== 'PLAYING'))) && status !== GameStatus.IDLE && status !== GameStatus.PLAYING && (
-              <div className="mt-8 border-t border-slate-800 pt-6">
-                <h3 className="text-slate-500 text-xs uppercase font-bold tracking-widest mb-4 text-center">Select Ritual Intensity</h3>
-                <div className="grid grid-cols-3 gap-3">
-                  <button
-                    onClick={() => handleStartGame('Easy')}
-                    className="py-3 bg-green-950/30 hover:bg-green-900/50 border border-green-800 hover:border-green-500 rounded text-green-400 font-bold text-xs uppercase tracking-wider transition-all"
-                  >
-                    Initiate
-                  </button>
-                  <button
-                    onClick={() => handleStartGame('Medium')}
-                    className="py-3 bg-yellow-950/30 hover:bg-yellow-900/50 border border-yellow-800 hover:border-yellow-500 rounded text-yellow-400 font-bold text-xs uppercase tracking-wider transition-all"
-                  >
-                    Summon
-                  </button>
-                  <button
-                    onClick={() => handleStartGame('Hard')}
-                    className="py-3 bg-red-950/30 hover:bg-red-900/50 border border-red-800 hover:border-red-500 rounded text-red-400 font-bold text-xs uppercase tracking-wider transition-all"
-                  >
-                    Curse
-                  </button>
-                </div>
-                <div className="flex justify-between px-2 mt-1 text-[10px] text-slate-600 font-bold uppercase tracking-widest">
-                  <span>Easy</span>
-                  <span>Medium</span>
-                  <span>Hard</span>
-                </div>
-              </div>
-            )
-          }
-
-        </div >
-
-        {/* Persistent Game Log (Top Left) */}
-
-
-        {/* Target Selection Modal (Dedicated Popup) */}
-        {
-          spellToCast && (
-            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-              <div className="bg-slate-900 border border-red-900 shadow-[0_0_50px_rgba(220,38,38,0.5)] rounded-lg w-full max-w-md p-6 flex flex-col gap-4">
-
-                <div className="text-center">
-                  <h3 className="text-3xl font-horror text-red-600 tracking-wider mb-2">CAST {spellToCast}</h3>
-                  <p className="text-slate-400 text-sm">Select a victim to curse...</p>
-                </div>
-
-                <div className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto">
-                  {players.filter(p => p.id !== myId).map(p => (
-                    <button
-                      key={p.id}
-                      onClick={() => handlePlayerSelect(p.id)}
-                      disabled={p.status !== 'PLAYING'}
-                      className="bg-black/50 hover:bg-red-900/40 border border-slate-700 hover:border-red-500 p-4 rounded flex items-center justify-between group transition-all"
-                    >
-                      <span className="font-bold text-slate-200 group-hover:text-white flex items-center gap-2">
-                        <User size={16} /> {p.name}
-                      </span>
-                      {p.status !== 'PLAYING' ? (
-                        <span className="text-[10px] text-slate-600 uppercase">Eliminated</span>
-                      ) : (
-                        <span className="text-xs text-red-500 opacity-0 group-hover:opacity-100 uppercase font-bold tracking-widest transition-opacity">
-                          CURSE
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                  {players.filter(p => p.id !== myId).length === 0 && (
-                    <div className="text-center text-slate-600 italic py-4">No victims available...</div>
-                  )}
-                </div>
-
-                <button
-                  onClick={() => setSpellToCast(null)}
-                  className="mt-2 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-bold transition-colors"
-                >
-                  CANCEL RITUAL
-                </button>
-              </div>
-            </div>
-          )
-        }
-      </div >
+      <GameSidebar
+        status={status}
+        players={players}
+        username={username}
+        amIHost={amIHost}
+        spawnBot={spawnBot}
+        setShowRules={setShowRules}
+        showRules={showRules}
+        loadingDifficulty={loadingDifficulty}
+        wordData={wordData}
+        guessedLetters={guessedLetters}
+        displayGuessedLetters={displayGuessedLetters}
+        unlockedHints={unlockedHints}
+        revealedHints={revealedHints}
+        gameMode={gameMode}
+        activeDebuffs={activeDebuffs}
+        curseEnergy={curseEnergy}
+        wrongGuesses={wrongGuesses}
+        handleGuess={handleGuess}
+        performSpellAction={handlePerformSpellAction}
+        onSoulMend={onSoulMend}
+        handleStartGame={handleStartGame}
+        handleOracle={handleOracle}
+        handleRoast={handleRoast}
+        handleGlitch={handleGlitch}
+        hasScared={hasScared}
+        round={round}
+        spectatingTargetId={spectatingTargetId}
+        setSpectatingTargetId={setSpectatingTargetId}
+        setSpectating={setSpectating}
+        autoNextRoundCountdown={autoNextRoundCountdown}
+        myId={myId}
+        targetPlayer={targetPlayer}
+      />
 
       {/* Spectator Window Modal */}
       {
