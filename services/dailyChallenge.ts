@@ -40,6 +40,8 @@ export const getDailyWord = async (): Promise<{ word: string; hints: string[] } 
             console.log(`[Daily Challenge] Found ${usedWords.length} previously used words`);
 
             // Generate a new unique word with hints
+            let word = '';
+            let hints: string[] = [];
             let attempts = 0;
             while (word.length < 10 && attempts < 3) {
                 const retry = await generateWord(['Hard']);
@@ -91,35 +93,39 @@ export const getDailyWord = async (): Promise<{ word: string; hints: string[] } 
             console.error("Daily Service Failed:", e);
             return null;
         }
-    };
+    } catch (error) {
+        console.error("Error in getDailyWord:", error);
+        return null;
+    }
+};
 
-    export const submitDailyAttempt = async (userId: string, timeTaken: number) => {
-        const today = new Date().toISOString().split('T')[0];
+export const submitDailyAttempt = async (userId: string, timeTaken: number) => {
+    const today = new Date().toISOString().split('T')[0];
 
-        const { error } = await supabase
-            .from('daily_attempts')
-            .insert({
-                challenge_date: today,
-                user_id: userId,
-                time_taken: timeTaken
-            });
+    const { error } = await supabase
+        .from('daily_attempts')
+        .insert({
+            challenge_date: today,
+            user_id: userId,
+            time_taken: timeTaken
+        });
 
-        if (error) console.error("Failed to submit attempt:", error);
-    };
+    if (error) console.error("Failed to submit attempt:", error);
+};
 
-    export const getDailyLeaderboard = async (date?: string): Promise<DailyAttempt[]> => {
-        const targetDate = date || new Date().toISOString().split('T')[0];
+export const getDailyLeaderboard = async (date?: string): Promise<DailyAttempt[]> => {
+    const targetDate = date || new Date().toISOString().split('T')[0];
 
-        const { data, error } = await supabase
-            .from('daily_attempts')
-            .select('*')
-            .eq('challenge_date', targetDate)
-            .order('time_taken', { ascending: true }) // Lowest time is best
-            .limit(10);
+    const { data, error } = await supabase
+        .from('daily_attempts')
+        .select('*')
+        .eq('challenge_date', targetDate)
+        .order('time_taken', { ascending: true }) // Lowest time is best
+        .limit(10);
 
-        if (error) {
-            console.error("Error fetching daily leaderboard:", error);
-            return [];
-        }
-        return data || [];
-    };
+    if (error) {
+        console.error("Error fetching daily leaderboard:", error);
+        return [];
+    }
+    return data || [];
+};
