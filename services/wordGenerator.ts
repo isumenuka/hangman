@@ -2,7 +2,7 @@ import { WordData, TournamentData } from "../types";
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 
 // API Key provided by user
-const API_KEY = "AIzaSyDoEXwejPFRzS7xFRbXM_pstd72Y9EOSR0";
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 // --- Infinite Difficulty Analysis ---
 // Ideally this would come from a database, but we will pass a simple summary object
@@ -43,7 +43,10 @@ export const generateTournamentBatch = async (banList: string[] = [], history?: 
          - The Word (Single noun, no spaces).
          - 5 Progressive Hints.
          - Difficulty Rating.
-         - A "Visual Hint CSS" (Abstract art style).
+         - A "Visual Hint CSS" string: Generate a valid CSS string for a div background that ABSTRACTLY represents the word. 
+            - Use background-image (gradients), filter, transform, box-shadow.
+            - DO NOT use external images/urls. Use only CSS gradients and shapes.
+            - Example for 'FIRE': "background: linear-gradient(to top, #450a0a, #ef4444, transparent); filter: blur(4px) contrast(150%);"
       4. Generate a "PROPHECY": A 4-line rhyming poem that vaguely hints at the themes/meanings of these 5 words without naming them. 
          - It should sound like an ancient curse.
       

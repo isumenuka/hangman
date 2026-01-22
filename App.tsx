@@ -1214,30 +1214,7 @@ export default function App() {
       {/* Mobile: Top 40%, Desktop: Flex Grow (Remaining Space) */}
       <div className="relative w-full h-[40vh] lg:h-full lg:flex-1 bg-black z-0 order-1 shadow-2xl lg:shadow-none">
         {/* VISUAL RIDDLE OVERLAY */}
-        {showVisualRiddle && wordData?.visual_hint_css && (
-          <div
-            className="absolute inset-0 z-[5] opacity-80 pointer-events-none transition-all duration-1000"
-            style={{ cssText: wordData.visual_hint_css } as any} // Direct CSS injection
-          >
-            {/* Fallback if style string is weird, we try native style attribute */}
-            <div className="w-full h-full" style={
-              // Parse the string into object? No, React style prop wants object.
-              // But Gemini returns a string like "background: ...".
-              // Better approach: use style attribute directly via ref or dangerouslySetInnerHTML?
-              // Simplest: Just use the string in a style tag or attribute if possible.
-              // React doesn't support string in style prop.
-              // Workaround: set attribute via ref? Or just parse it?
-              // Actually, let's use a style tag for this specific ID.
-              {}
-            } />
-            <style>{`
-               .visual-riddle-layer {
-                 ${wordData.visual_hint_css}
-               }
-             `}</style>
-            <div className="visual-riddle-layer w-full h-full animate-in fade-in duration-1000"></div>
-          </div>
-        )}
+        {/* VISUAL RIDDLE REMOVED */}
 
         {/* JUMPSCARE OVERLAY */}
         {showJumpscare && (
@@ -1280,24 +1257,7 @@ export default function App() {
             </div>
           )}
 
-          {/* Audio Toggle (Pointer Events re-enabled) */}
-          <button
-            onClick={async () => {
-              if (!audioEnabled) {
-                await AudioEngine.init();
-                setAudioEnabled(true);
-              } else {
-                setAudioEnabled(false);
-                AudioEngine.stop();
-              }
-            }}
-            className={clsx(
-              "mt-4 pointer-events-auto px-4 py-1 rounded-full border text-[10px] font-bold uppercase tracking-widest transition-all flex items-center gap-2",
-              audioEnabled ? "bg-purple-900/80 border-purple-500 text-purple-200" : "bg-black/40 border-slate-700 text-slate-500 hover:bg-black/60"
-            )}
-          >
-            {isComposing ? <Loader2 size={10} className="animate-spin" /> : (audioEnabled ? "🔊 Spirit Box: ON" : "🔇 Spirit Box: OFF")}
-          </button>
+          {/* SPIRIT BOX REMOVED */}
         </div>
 
         {/* Persistent Game Log (Top Left of 3D Scene) */}
@@ -1417,17 +1377,7 @@ export default function App() {
           <div className="mb-6">
             <div className="flex justify-between items-center mb-2">
               <h3 className="text-slate-500 text-xs uppercase font-bold tracking-widest">Ritual Clues</h3>
-              {wordData?.visual_hint_css && (
-                <button
-                  onClick={() => setShowVisualRiddle(!showVisualRiddle)}
-                  className={clsx(
-                    "text-[10px] uppercase font-bold px-2 py-1 rounded border transition-colors flex items-center gap-1",
-                    showVisualRiddle ? "bg-purple-900 text-purple-200 border-purple-500" : "bg-slate-800 text-slate-400 border-slate-700 hover:border-purple-500"
-                  )}
-                >
-                  <Eye size={12} /> {showVisualRiddle ? "Hide Vision" : "Invoke Vision"}
-                </button>
-              )}
+              {/* INVOKE VISION REMOVED */}
             </div>
 
             <div className="space-y-2">

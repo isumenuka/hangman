@@ -2,7 +2,7 @@ import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { GameMasterResponse } from "../types";
 
 // API Key provided by user
-const API_KEY = "AIzaSyDoEXwejPFRzS7xFRbXM_pstd72Y9EOSR0";
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 // Using Flash for speed as per plan
