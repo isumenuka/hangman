@@ -575,7 +575,7 @@ export default function App() {
 
   // --- Actions ---
 
-  const handleStartGame = async () => {
+  const handleStartGame = async (difficulty: 'Easy' | 'Medium' | 'Hard' = 'Medium') => {
     if (loading) return;
     soundManager.playClick();
     setLoading(true);
@@ -591,20 +591,24 @@ export default function App() {
 
       // Logic: If queue empty OR Round 1, generate batch. 
       // If queue has items and we are just moving to next round, use queue.
-      if (wordQueue.length > 0 && nextRound > 1) {
-        dataToUse = wordQueue[0];
-        setWordQueue(prev => prev.slice(1));
-      } else {
-        // New Batch Needed (Round 1 or Forced)
-        // Provide history for infinite difficulty?
-        const history = { winRate: 0.5 }; // Simplification for now
-        const batch = await generateTournamentBatch(usedWords, history);
+      // BUT if user explicitly selected a difficulty, we should probably regenerate or filter?
+      // For now, let's assume we regenerate batch if queue is empty or it's a new "Ritual".
+      // Actually, since we are doing "Infinite Difficulty", maybe we should always generate if they pick?
+      // Let's stick to the tournament batch logic: if queue exists, use it. 
+      // WAIT: User said "sect one of them then use gemini". If they pick Easy, they want an Easy word NOW.
+      // So if they make a choice, we should probably force generation of that difficulty.
 
-        dataToUse = batch.words[0];
-        setWordQueue(batch.words.slice(1));
-        setProphecy(batch.prophecy);
-        setShowProphecy(true); // SHOW PROPHECY!
-      }
+      // Override: Always generate new batch if manually starting via difficulty buttons
+      // Provide history for infinite difficulty?
+      const history = { winRate: 0.5 }; // Simplification for now
+
+      // Pass the selected difficulty to the batch generator
+      const batch = await generateTournamentBatch(usedWords, history, difficulty);
+
+      dataToUse = batch.words[0];
+      setWordQueue(batch.words.slice(1));
+      setProphecy(batch.prophecy);
+      setShowProphecy(true); // SHOW PROPHECY!
 
       setRound(nextRound);
 
@@ -635,11 +639,14 @@ export default function App() {
       soundManager.playWrong();
 
       let errorMsg = "Ritual Failed: Could not summon a word.";
-      let detailedMsg = "";
+      let detailedMsg = e.message || "Unknown error occurred.";
 
-      if (e.message === "API_LIMIT_EXCEEDED" || e.message?.includes("429")) {
+      if (e.message === "API_KEY_MISSING") {
+        errorMsg = "🚫 MISSING API KEY";
+        detailedMsg = "Please check your .env file and ensure VITE_GEMINI_API_KEY is set.";
+      } else if (e.message?.includes("429") || e.message?.includes("Quota")) {
         errorMsg = "🚫 API QUOTA EXCEEDED";
-        detailedMsg = "You've reached the free tier limit for the Gemini API. Please wait ~30 seconds and try again, or check your API quota at ai.google.dev";
+        detailedMsg = "Gemini is tired. Please wait a moment.";
       }
 
       setGameLog(prev => [{
@@ -647,7 +654,7 @@ export default function App() {
         content: (
           <div className="text-red-600 font-bold">
             <div className="text-lg mb-1">{errorMsg}</div>
-            {detailedMsg && <div className="text-sm text-red-400 font-normal">{detailedMsg}</div>}
+            <div className="text-sm text-red-400 font-normal">{detailedMsg}</div>
           </div>
         )
       }, ...prev]);
@@ -1031,14 +1038,33 @@ export default function App() {
                 </div>
               ) : <Loader2 className="animate-spin mx-auto mb-6" />}
 
-              <button
-                onClick={handleStartGame}
-                disabled={loading || players.length < 1}
-                className="w-full py-4 bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded font-bold text-xl flex items-center justify-center gap-2"
-              >
-                {loading ? <Loader2 className="animate-spin" /> : <Play size={24} />}
-                BEGIN RITUAL
-              </button>
+              {/* Difficulty Selection */}
+              <div className="w-full">
+                <p className="text-slate-400 mb-2 font-bold uppercase tracking-wider text-xs">Select Intensity to Begin</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => handleStartGame('Easy')}
+                    disabled={loading || players.length < 1}
+                    className="py-4 bg-green-950/40 hover:bg-green-600 border border-green-800 hover:border-green-400 rounded font-bold text-xs md:text-sm uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+                  >
+                    {loading ? <Loader2 className="animate-spin mx-auto" /> : <span className="group-hover:text-white text-green-400">Initiate</span>}
+                  </button>
+                  <button
+                    onClick={() => handleStartGame('Medium')}
+                    disabled={loading || players.length < 1}
+                    className="py-4 bg-yellow-950/40 hover:bg-yellow-600 border border-yellow-800 hover:border-yellow-400 rounded font-bold text-xs md:text-sm uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+                  >
+                    {loading ? <Loader2 className="animate-spin mx-auto" /> : <span className="group-hover:text-white text-yellow-400">Summon</span>}
+                  </button>
+                  <button
+                    onClick={() => handleStartGame('Hard')}
+                    disabled={loading || players.length < 1}
+                    className="py-4 bg-red-950/40 hover:bg-red-600 border border-red-800 hover:border-red-400 rounded font-bold text-xs md:text-sm uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+                  >
+                    {loading ? <Loader2 className="animate-spin mx-auto" /> : <span className="group-hover:text-white text-red-400">Curse</span>}
+                  </button>
+                </div>
+              </div>
 
               {/* Error Display */}
               {gameLog.length > 0 && gameLog[0].content && (
@@ -1631,15 +1657,36 @@ export default function App() {
           {/* Player List (Inline for Desktop Sidebar) */}
           {/* We can put it in a collapsable or just below if there's space. Let's make it a toggle or separate tab? 
                  Actually, just putting it at the bottom is safe since it scroll. */}
+          {/* RITUAL SELECTION (Difficulty) */}
           {
-            gameMode !== 'SINGLE' && (
-              <div className="mt-8 border-t border-slate-800 pt-4">
-                <PlayerList
-                  players={players}
-                  myId={myId}
-                  onPlayerSelect={handlePlayerSelect} // Re-enabled
-                  selectionMode={!!spellToCast}
-                />
+            (gameMode === 'SINGLE' || (amIHost && players.every(p => p.status !== 'PLAYING'))) && status !== GameStatus.IDLE && status !== GameStatus.PLAYING && (
+              <div className="mt-8 border-t border-slate-800 pt-6">
+                <h3 className="text-slate-500 text-xs uppercase font-bold tracking-widest mb-4 text-center">Select Ritual Intensity</h3>
+                <div className="grid grid-cols-3 gap-3">
+                  <button
+                    onClick={() => handleStartGame('Easy')}
+                    className="py-3 bg-green-950/30 hover:bg-green-900/50 border border-green-800 hover:border-green-500 rounded text-green-400 font-bold text-xs uppercase tracking-wider transition-all"
+                  >
+                    Initiate
+                  </button>
+                  <button
+                    onClick={() => handleStartGame('Medium')}
+                    className="py-3 bg-yellow-950/30 hover:bg-yellow-900/50 border border-yellow-800 hover:border-yellow-500 rounded text-yellow-400 font-bold text-xs uppercase tracking-wider transition-all"
+                  >
+                    Summon
+                  </button>
+                  <button
+                    onClick={() => handleStartGame('Hard')}
+                    className="py-3 bg-red-950/30 hover:bg-red-900/50 border border-red-800 hover:border-red-500 rounded text-red-400 font-bold text-xs uppercase tracking-wider transition-all"
+                  >
+                    Curse
+                  </button>
+                </div>
+                <div className="flex justify-between px-2 mt-1 text-[10px] text-slate-600 font-bold uppercase tracking-widest">
+                  <span>Easy</span>
+                  <span>Medium</span>
+                  <span>Hard</span>
+                </div>
               </div>
             )
           }

@@ -12,7 +12,7 @@ interface PlayerHistory {
   mostMissedLetters?: string[]; // e.g. ['Z', 'X', 'Q']
 }
 
-export const generateTournamentBatch = async (banList: string[] = [], history?: PlayerHistory): Promise<TournamentData> => {
+export const generateTournamentBatch = async (banList: string[] = [], history?: PlayerHistory, difficultyOverride?: 'Easy' | 'Medium' | 'Hard'): Promise<TournamentData> => {
   if (!API_KEY) throw new Error("API_KEY_MISSING");
 
   const genAI = new GoogleGenerativeAI(API_KEY);
@@ -20,7 +20,9 @@ export const generateTournamentBatch = async (banList: string[] = [], history?: 
 
   // Adaptive Difficulty Prompting
   let difficultyContext = "Mix of Easy, Medium, Hard words.";
-  if (history) {
+  if (difficultyOverride) {
+    difficultyContext = `STRICTLY GENERATE ONLY ${difficultyOverride.toUpperCase()} WORDS. ALL 5 WORDS MUST BE ${difficultyOverride.toUpperCase()}.`;
+  } else if (history) {
     if (history.winRate > 0.8) {
       difficultyContext = "Player is ELITE. Generate OBSCURE, LONG, and PHONETICALLY COMPLEX words (e.g., lots of consonants, tricky vowels). Focus on letters like: " + (history.mostMissedLetters?.join(',') || 'J, Z, Q, X');
     } else if (history.winRate < 0.3) {
