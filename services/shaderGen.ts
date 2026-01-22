@@ -3,10 +3,10 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const API_KEY = "AIzaSyDoEXwejPFRzS7xFRbXM_pstd72Y9EOSR0"; // Using same key as imposter.ts for consistency
 const genAI = new GoogleGenerativeAI(API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+const model = genAI.getGenerativeModel({ model: "gemini-3-pro-preview" });
 
 export const generateShader = async (mood: string): Promise<string> => {
-    const prompt = `
+  const prompt = `
     Write a GLSL fragment shader for a background effect.
     MOOD: ${mood}
     
@@ -23,24 +23,24 @@ export const generateShader = async (mood: string): Promise<string> => {
     - Ensure #ifdef GL_ES precision mediump float; #endif is at the top.
   `;
 
-    try {
-        const result = await model.generateContent({
-            contents: [{ role: "user", parts: [{ text: prompt }] }],
-            generationConfig: {
-                temperature: 1.1, // High creativity
-                topP: 0.95,
-            }
-        });
+  try {
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        temperature: 1.1, // High creativity
+        topP: 0.95,
+      }
+    });
 
-        let code = result.response.text();
-        // Clean up if Gemini adds markdown
-        code = code.replace(/```glsl/g, '').replace(/```/g, '').trim();
-        return code;
+    let code = result.response.text();
+    // Clean up if Gemini adds markdown
+    code = code.replace(/```glsl/g, '').replace(/```/g, '').trim();
+    return code;
 
-    } catch (error) {
-        console.error("Shader Generation Failed:", error);
-        // Fallback shader (simple gradient)
-        return `
+  } catch (error) {
+    console.error("Shader Generation Failed:", error);
+    // Fallback shader (simple gradient)
+    return `
       #ifdef GL_ES
       precision mediump float;
       #endif
@@ -51,5 +51,5 @@ export const generateShader = async (mood: string): Promise<string> => {
         gl_FragColor = vec4(0.5 + 0.5*cos(time+uv.xyx+vec3(0,2,4)), 1.0);
       }
     `;
-    }
+  }
 };

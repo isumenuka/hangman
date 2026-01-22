@@ -16,7 +16,7 @@ export const generateTournamentBatch = async (banList: string[] = [], history?: 
   if (!API_KEY) throw new Error("API_KEY_MISSING");
 
   const genAI = new GoogleGenerativeAI(API_KEY);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+  const model = genAI.getGenerativeModel({ model: "gemini-3-pro-preview" });
 
   // Adaptive Difficulty Prompting
   let difficultyContext = "Mix of Easy, Medium, Hard words.";

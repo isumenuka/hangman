@@ -6,7 +6,7 @@ const API_KEY = "AIzaSyDoEXwejPFRzS7xFRbXM_pstd72Y9EOSR0";
 
 const genAI = new GoogleGenerativeAI(API_KEY);
 // Using Flash for speed as per plan
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+const model = genAI.getGenerativeModel({ model: "gemini-3-pro-preview" });
 
 export const consultGameMaster = async (
     context: {

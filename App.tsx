@@ -14,6 +14,8 @@ import { updateGameStats, supabase } from './utils/supabase';
 import { consultGameMaster } from './services/gameMaster';
 import { getBotAction } from './services/imposter';
 import { getOracleHint, generateRoast, generateGlitchText, getRitualPhrase } from './services/powers';
+import { composeTheme } from './services/composer';
+import { AudioEngine } from './utils/AudioEngine';
 import ShaderBackground from './components/ShaderBackground';
 
 const MAX_MISTAKES = 5;
@@ -45,11 +47,39 @@ export default function App() {
   const [userRitualInput, setUserRitualInput] = useState('');
   const [revealedHints, setRevealedHints] = useState(1);
 
+  // --- Audio State ---
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [isComposing, setIsComposing] = useState(false);
+
   // --- GM State ---
   const [gmNarrative, setGmNarrative] = useState<string | null>(null);
   const [activeRule, setActiveRule] = useState<'NONE' | 'VOWELS_DISABLED' | 'Invert_Controls' | 'SILENCE'>('NONE');
   const [atmosphere, setAtmosphere] = useState<AtmosphereType>('NONE');
 
+  // --- COMPOSER EFFECT ---
+  useEffect(() => {
+    if (!wordData || !audioEnabled) return;
+
+    const compose = async () => {
+      setIsComposing(true);
+      try {
+        console.log("Composing theme for:", wordData.word);
+        const composition = await composeTheme(wordData.word, atmosphere);
+        console.log("Composition ready:", composition);
+        AudioEngine.playComposition(composition);
+      } catch (e) {
+        console.error("Composition failed", e);
+      } finally {
+        setIsComposing(false);
+      }
+    };
+    compose();
+
+    // Cleanup when word changes or component unmounts
+    return () => {
+      // Optional: AudioEngine.stop(); // Maybe keep playing until next track?
+    };
+  }, [wordData, atmosphere, audioEnabled]);
 
 
   // --- Multiplayer State ---
@@ -1249,6 +1279,25 @@ export default function App() {
               <span>👁️</span> {mySpectators.length} watching you
             </div>
           )}
+
+          {/* Audio Toggle (Pointer Events re-enabled) */}
+          <button
+            onClick={async () => {
+              if (!audioEnabled) {
+                await AudioEngine.init();
+                setAudioEnabled(true);
+              } else {
+                setAudioEnabled(false);
+                AudioEngine.stop();
+              }
+            }}
+            className={clsx(
+              "mt-4 pointer-events-auto px-4 py-1 rounded-full border text-[10px] font-bold uppercase tracking-widest transition-all flex items-center gap-2",
+              audioEnabled ? "bg-purple-900/80 border-purple-500 text-purple-200" : "bg-black/40 border-slate-700 text-slate-500 hover:bg-black/60"
+            )}
+          >
+            {isComposing ? <Loader2 size={10} className="animate-spin" /> : (audioEnabled ? "🔊 Spirit Box: ON" : "🔇 Spirit Box: OFF")}
+          </button>
         </div>
 
         {/* Persistent Game Log (Top Left of 3D Scene) */}
