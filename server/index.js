@@ -5,12 +5,10 @@ const cors = require('cors');
 
 const app = express();
 const port = process.env.PORT || 9000;
-const { task: dailyTask, generateDailyChallenge } = require('./dailyGenerator');
-
 // Start Cron Job
-console.log('[Server] Starting Daily Challenge Automation...');
-// Run immediately on startup to ensure today has a word (optional, good for dev)
-// generateDailyChallenge(); 
+// Note: Automation has been moved to Vercel Cron (api/cron.js)
+// Console log kept for debugging context
+console.log('[Server] Socket.IO Server Starting...');
 
 
 // Enable CORS for all origins (Crucial for Vercel -> Render communication)
