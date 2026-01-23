@@ -139,6 +139,11 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, onExit
                 // Refresh Leaderboard
                 getDailyLeaderboard().then(setLeaderboard);
 
+                // Auto Redirect
+                setTimeout(() => {
+                    onExit();
+                }, 4000);
+
             } else if (isLost) {
                 setStatus(GameStatus.LOST);
                 clearInterval(timerRef.current);
@@ -153,9 +158,14 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, onExit
                     scares_used: 0,
                     user_id: username || 'Anonymous'
                 });
+
+                // Auto Redirect
+                setTimeout(() => {
+                    onExit();
+                }, 4000);
             }
         }
-    }, [isWon, isLost, status, username, elapsedTime]);
+    }, [isWon, isLost, status, username, elapsedTime, onExit, wordData]);
 
     const handleStart = () => {
         if (!wordData) return;
@@ -286,73 +296,88 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, onExit
                 </div>
             )}
 
-            {/* ACTIVE GAME LAYOUT (Matches App.tsx) */}
-            <div className="flex flex-col lg:flex-row w-full h-full">
+            {/* ACTIVE GAME LAYOUT (Matches App.tsx) - Only render when game is active */}
+            {status !== GameStatus.IDLE && (
+                <div className="flex flex-col lg:flex-row w-full h-full">
 
-                {/* 3D Scene Area */}
-                <div className="relative w-full h-[40vh] lg:h-full lg:flex-1 bg-black z-0 order-1 shadow-2xl lg:shadow-none">
-                    {/* Daily Timer Overlay */}
-                    {status === GameStatus.PLAYING && (
-                        <div className="absolute top-4 left-4 z-20 bg-black/50 backdrop-blur border border-red-500/30 px-6 py-2 rounded-full flex items-center gap-3 pointer-events-none">
-                            <Clock className="text-red-500 animate-pulse" size={20} />
-                            <span className="text-2xl font-mono font-bold text-red-100">
-                                {(elapsedTime / 1000).toFixed(2)}
-                            </span>
-                        </div>
-                    )}
+                    {/* 3D Scene Area */}
+                    <div className="relative w-full h-[40vh] lg:h-full lg:flex-1 bg-black z-0 order-1 shadow-2xl lg:shadow-none">
+                        {/* Daily Timer Overlay */}
+                        {status === GameStatus.PLAYING && (
+                            <div className="absolute top-4 left-4 z-20 bg-black/50 backdrop-blur border border-red-500/30 px-6 py-2 rounded-full flex items-center gap-3 pointer-events-none">
+                                <Clock className="text-red-500 animate-pulse" size={20} />
+                                <span className="text-2xl font-mono font-bold text-red-100">
+                                    {(elapsedTime / 1000).toFixed(2)}
+                                </span>
+                            </div>
+                        )}
 
-                    <GameSceneOverlay
-                        showJumpscare={false}
-                        currentJumpscareVideo=""
-                        setShowJumpscare={() => { }}
-                        autoNextRoundCountdown={null}
-                        round={1}
-                        gameLog={gameLog}
-                        mySpectators={[]}
-                        showHintUnlock={false}
-                    />
-                    <GameScene
-                        isWon={status === GameStatus.WON}
-                        isLost={status === GameStatus.LOST}
+                        <GameSceneOverlay
+                            showJumpscare={false}
+                            currentJumpscareVideo=""
+                            setShowJumpscare={() => { }}
+                            autoNextRoundCountdown={null}
+                            round={1}
+                            gameLog={gameLog}
+                            mySpectators={[]}
+                            showHintUnlock={false}
+                        />
+
+                        {/* Redirect Message Overlay */}
+                        {(status === GameStatus.WON || status === GameStatus.LOST) && (
+                            <div className="absolute top-20 w-full text-center z-50 pointer-events-none animate-pulse">
+                                <div className="inline-block bg-black/80 backdrop-blur border border-red-500/50 px-6 py-3 rounded-lg shadow-xl">
+                                    <p className="text-slate-200 text-sm font-bold uppercase tracking-widest mb-1">Ritual Complete</p>
+                                    <p className="text-red-400 text-xs flex items-center justify-center gap-2">
+                                        <Loader2 size={12} className="animate-spin" /> Returning to Menu...
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        <GameScene
+                            isWon={status === GameStatus.WON}
+                            isLost={status === GameStatus.LOST}
+                            wrongGuesses={wrongGuesses}
+                        />
+                    </div>
+
+                    {/* Sidebar */}
+                    <GameSidebar
+                        status={status}
+                        players={[{ id: 'me', name: username, mistakes: wrongGuesses, status: isWon ? 'WON' : isLost ? 'LOST' : 'PLAYING' } as any]}
+                        username={username}
+                        amIHost={true}
+                        spawnBot={() => { }}
+                        setShowRules={() => { }}
+                        showRules={false}
+                        loadingDifficulty={null}
+                        wordData={wordData}
+                        guessedLetters={guessedLetters}
+                        displayGuessedLetters={guessedLetters}
+                        unlockedHints={wrongGuesses + 1}
+                        revealedHints={wrongGuesses + 1}
+                        gameMode={'DAILY'}
+                        activeDebuffs={[]}
+                        curseEnergy={0}
                         wrongGuesses={wrongGuesses}
+                        handleGuess={handleGuess}
+                        performSpellAction={() => { }}
+                        onSoulMend={() => { }}
+                        handleStartGame={() => { }} // No restart in Daily
+                        handleOracle={() => { }}
+                        handleRoast={() => { }}
+                        handleGlitch={() => { }}
+                        hasScared={false}
+                        round={1}
+                        spectatingTargetId={null}
+                        setSpectatingTargetId={() => { }}
+                        setSpectating={() => { }}
+                        autoNextRoundCountdown={null}
+                        myId={'me'}
                     />
                 </div>
-
-                {/* Sidebar */}
-                <GameSidebar
-                    status={status}
-                    players={[{ id: 'me', name: username, mistakes: wrongGuesses, status: isWon ? 'WON' : isLost ? 'LOST' : 'PLAYING' } as any]}
-                    username={username}
-                    amIHost={true}
-                    spawnBot={() => { }}
-                    setShowRules={() => { }}
-                    showRules={false}
-                    loadingDifficulty={null}
-                    wordData={wordData}
-                    guessedLetters={guessedLetters}
-                    displayGuessedLetters={guessedLetters}
-                    unlockedHints={wrongGuesses + 1}
-                    revealedHints={wrongGuesses + 1}
-                    gameMode={'DAILY'}
-                    activeDebuffs={[]}
-                    curseEnergy={0}
-                    wrongGuesses={wrongGuesses}
-                    handleGuess={handleGuess}
-                    performSpellAction={() => { }}
-                    onSoulMend={() => { }}
-                    handleStartGame={() => { }} // No restart in Daily
-                    handleOracle={() => { }}
-                    handleRoast={() => { }}
-                    handleGlitch={() => { }}
-                    hasScared={false}
-                    round={1}
-                    spectatingTargetId={null}
-                    setSpectatingTargetId={() => { }}
-                    setSpectating={() => { }}
-                    autoNextRoundCountdown={null}
-                    myId={'me'}
-                />
-            </div>
+            )}
         </div>
     );
 };

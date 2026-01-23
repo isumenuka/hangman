@@ -457,7 +457,7 @@ export function GameSidebar({
 
                 {/* Restart Button */}
                 {
-                    (gameMode === 'SINGLE' || (amIHost && players.every(p => p.status !== 'PLAYING'))) && status !== GameStatus.IDLE && status !== GameStatus.PLAYING && (
+                    (gameMode === 'SINGLE' || (amIHost && players.every(p => p.status !== 'PLAYING'))) && status !== GameStatus.IDLE && status !== GameStatus.PLAYING && gameMode !== 'DAILY' && (
                         <button
                             onClick={() => handleStartGame()}
                             className="mt-6 w-full py-3 bg-red-900 hover:bg-red-800 text-white font-bold rounded flex items-center justify-center gap-2 transition-colors border-t border-red-700"
@@ -469,7 +469,7 @@ export function GameSidebar({
 
                 {/* Spectator Controls */}
                 {
-                    (status === GameStatus.WON || status === GameStatus.LOST) && !spectatingTargetId && gameMode !== 'SINGLE' && (
+                    (status === GameStatus.WON || status === GameStatus.LOST) && !spectatingTargetId && gameMode !== 'SINGLE' && gameMode !== 'DAILY' && (
                         <div className="mt-4 p-4 bg-slate-900/80 border border-slate-700 rounded">
                             <h3 className="text-slate-400 text-xs uppercase font-bold mb-2">Spectate Players</h3>
                             <div className="flex flex-wrap gap-2">
@@ -500,7 +500,7 @@ export function GameSidebar({
 
                 {/* RITUAL SELECTION (Difficulty) */}
                 {
-                    (gameMode === 'SINGLE' || (amIHost && players.every(p => p.status !== 'PLAYING'))) && status !== GameStatus.IDLE && status !== GameStatus.PLAYING && (
+                    (gameMode === 'SINGLE' || (amIHost && players.every(p => p.status !== 'PLAYING'))) && status !== GameStatus.IDLE && status !== GameStatus.PLAYING && gameMode !== 'DAILY' && (
                         <div className="mt-8 border-t border-slate-800 pt-6">
                             <h3 className="text-slate-500 text-xs uppercase font-bold tracking-widest mb-4 text-center">Select Ritual Intensity</h3>
                             <div className="grid grid-cols-3 gap-3">
