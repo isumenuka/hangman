@@ -22,6 +22,7 @@ declare global {
       meshStandardMaterial: any;
       color: any;
       fog: any;
+      hemisphereLight: any;
     }
   }
   namespace React {
@@ -41,6 +42,7 @@ declare global {
         meshStandardMaterial: any;
         color: any;
         fog: any;
+        hemisphereLight: any;
       }
     }
   }
@@ -48,13 +50,13 @@ declare global {
 
 // --- Materials ---
 const WoodMaterial = new THREE.MeshStandardMaterial({
-  color: '#3d2817', // Slightly lighter wood
-  roughness: 0.9,
+  color: '#8b5a2b', // Much lighter wood (Brown)
+  roughness: 0.8,
   metalness: 0,
 });
 
 const RopeMaterial = new THREE.MeshStandardMaterial({
-  color: '#a08060', // Lighter rope
+  color: '#d2b48c', // Tan rope
   roughness: 1
 });
 
@@ -107,7 +109,7 @@ const Lantern = () => {
           <cylinderGeometry args={[0.1, 0.15, 0.4, 4]} />
           <meshStandardMaterial color="#111" />
         </mesh>
-        <pointLight ref={lightRef} color="#ffaa00" distance={25} decay={2} castShadow shadow-bias={-0.0001} />
+        <pointLight ref={lightRef} color="#ffaa00" distance={25} decay={2} castShadow shadowBias={-0.0001} />
       </group>
     </group>
   );
@@ -305,34 +307,22 @@ const ResponsiveCamera = () => {
   useEffect(() => {
     const aspect = size.width / size.height;
 
-    // Bounds:
-    // Gallows Height: ~7 units (-5 to +2)
-    // Gallows Width: ~5 units
-
-    // Vertical FOV is fixed at 45.
-    // Visible Height = 2 * Dist * tan(22.5) ~ 0.828 * Dist
-
-    let targetZ = 9;
-    let targetY = 2;
+    // Zoomed out to show full gallows
+    let targetZ = 12;
+    let targetY = 0; // Center vertically
 
     if (aspect < 0.6) {
-      // Deep Portrait (Mobile Fullscreen Menu)
-      // Need width to fit 5 units.
-      // Visible Width = Visible Height * aspect = 0.828 * Dist * 0.6
-      // 5 = 0.49 * Dist => Dist ~ 10.
-      // But we want margins. Let's go safe.
-      targetZ = 18;
-      targetY = 0; // Center vertically
+      // Mobile Portrait
+      targetZ = 22; // Much further back
+      targetY = -1;
     } else if (aspect < 1.4) {
-      // Square-ish / Tablet / Mobile Game View (40vh)
-      // Height fits tighter here.
-      // If Dist=9, Height=7.45. Content=7. Too tight.
-      targetZ = 13;
-      targetY = 1;
+      // Tablet / Mobile Landscape / Squarish
+      targetZ = 16;
+      targetY = 0;
     } else {
-      // Desktop
-      targetZ = 9;
-      targetY = 2;
+      // Desktop Wide
+      targetZ = 12; // Further back to see everything
+      targetY = 0;
     }
 
     camera.position.set(0, targetY, targetZ);
@@ -382,62 +372,68 @@ export const GameScene: React.FC<SceneProps> = ({ wrongGuesses, isWon, isLost, a
   }, [atmosphere]);
 
   return (
-    <Canvas shadows camera={{ position: [0, 2, 9], fov: 45 }}>
+    <Canvas shadows camera={{ position: [0, 0, 12], fov: 45 }}>
       <ResponsiveCamera />
 
       {/* Dynamic Background */}
       <color attach="background" args={[settings.bg]} />
-      <fog attach="fog" args={[settings.fog, 12, 45]} />
+      <fog attach="fog" args={[settings.fog, 10, 40]} />
 
-      {/* --- Dynamic Lighting --- */}
+      {/* --- Dynamic Lighting (BOOSTED) --- */}
+
+      {/* Base Illumination (Fail-safe) */}
+      <hemisphereLight intensity={2.0} color="#ffffff" groundColor="#444444" />
 
       {/* Ambient */}
-      <ambientLight intensity={1.5} color={settings.ambient} />
+      <ambientLight intensity={3.0} color={settings.ambient} />
 
       {/* Main Spot (Moonlight) */}
       <spotLight
         position={[-5, 10, 10]}
         angle={0.6}
         penumbra={0.5}
-        intensity={settings.spotIntensity}
+        intensity={settings.spotIntensity * 2} // Double intensity
         color={settings.spot}
         castShadow
         shadow-mapSize={[2048, 2048]}
-        shadow-bias={-0.0001}
+        shadowBias={-0.0001}
       />
 
       {/* Fill Light (Warm) */}
-      <pointLight position={[2, 3, 5]} intensity={2} color="#e0e7ff" />
+      <pointLight position={[2, 3, 5]} intensity={4} color="#e0e7ff" />
 
       {/* Rim Light (Pop) */}
-      <spotLight position={[0, 5, -8]} intensity={5} color={settings.rim} />
+      <spotLight position={[0, 5, -8]} intensity={8} color={settings.rim} />
 
       {/* Ground illumination */}
-      <directionalLight position={[0, -5, 0]} intensity={1} color="#334155" />
+      <directionalLight position={[0, -5, 0]} intensity={2} color="#64748b" />
 
       {/* --- Environment --- */}
-      <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={0.5} />
-      <Sparkles count={100} scale={15} size={4} speed={0.4} opacity={0.5} color={atmosphere === 'RED_FOG' ? '#ff0000' : '#818cf8'} />
-      <Cloud position={[-4, -2, -5]} speed={0.2} opacity={0.1} color={settings.fog} />
-      <Cloud position={[4, 2, -5]} speed={0.2} opacity={0.1} color={settings.fog} />
+      <Stars radius={100} depth={50} count={5000} factor={4} saturation={1} fade speed={0.5} />
+      <Sparkles count={100} scale={15} size={4} speed={0.4} opacity={0.8} color={atmosphere === 'RED_FOG' ? '#ff0000' : '#818cf8'} />
+
+      <React.Suspense fallback={null}>
+        <Cloud position={[-4, -2, -5]} speed={0.2} opacity={0.2} color={settings.fog} />
+        <Cloud position={[4, 2, -5]} speed={0.2} opacity={0.2} color={settings.fog} />
+      </React.Suspense>
 
       <group position={[0, -1, 0]}>
         <Gallows />
         <HangmanFigure wrongGuesses={wrongGuesses} isDead={isLost} isWon={isWon} />
       </group>
 
-      {/* Floor */}
+      {/* Floor - lighter color */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -3, 0]} receiveShadow>
         <planeGeometry args={[100, 100]} />
-        <meshStandardMaterial color={atmosphere === 'DARKNESS' ? '#050505' : "#1e293b"} roughness={0.5} />
+        <meshStandardMaterial color={atmosphere === 'DARKNESS' ? '#111' : "#334155"} roughness={0.5} />
       </mesh>
 
       <OrbitControls
         enablePan={false}
         minPolarAngle={Math.PI / 3}
         maxPolarAngle={Math.PI / 1.8}
-        minDistance={6}
-        maxDistance={20}
+        minDistance={4}
+        maxDistance={25}
       />
     </Canvas>
   );
