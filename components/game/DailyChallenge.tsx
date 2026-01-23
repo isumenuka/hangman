@@ -216,51 +216,50 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, onExit
     }
 
     return (
-        <div className="w-full h-full flex items-center justify-center bg-slate-950 overflow-hidden relative">
+        <div className="w-full h-screen bg-slate-950 overflow-hidden relative flex flex-col">
 
-            {/* Left: Leaderboard & Info (Lobby Style) */}
-            {status === GameStatus.IDLE || status === GameStatus.WON || status === GameStatus.LOST ? (
-                <div className="max-w-md w-full bg-slate-900/95 backdrop-blur-md rounded-lg border border-red-900/50 p-8 shadow-2xl shadow-red-900/20 z-20">
-                    <button onClick={onExit} className="self-start text-slate-500 hover:text-white flex items-center gap-2 mb-6">
-                        <ArrowLeft size={16} /> BACK TO MENU
-                    </button>
+            {/* IDLE / MENU STATE (Lobby Style Overlay) */}
+            {status === GameStatus.IDLE && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+                    <div className="max-w-md w-full bg-slate-900/95 backdrop-blur-md rounded-lg border border-red-900/50 p-8 shadow-2xl shadow-red-900/20">
+                        <button onClick={onExit} className="self-start text-slate-500 hover:text-white flex items-center gap-2 mb-6">
+                            <ArrowLeft size={16} /> BACK TO MENU
+                        </button>
 
-                    <h1 className="text-4xl font-horror text-red-600 mb-2">DAILY RITUAL</h1>
-                    <p className="text-slate-400 text-sm mb-6">One Word. Infinite Glory.</p>
+                        <h1 className="text-4xl font-horror text-red-600 mb-2">DAILY RITUAL</h1>
+                        <p className="text-slate-400 text-sm mb-6">One Word. Infinite Glory.</p>
 
-                    {/* Yesterday's Champions */}
-                    {yesterdayWinners.length > 0 && (
-                        <div className="mb-6 bg-slate-950/50 border border-yellow-700/30 rounded-lg p-4">
-                            <h3 className="text-yellow-500 text-xs uppercase font-bold tracking-widest mb-3 flex items-center gap-2">
-                                <Trophy size={14} /> Yesterday's Champions
-                            </h3>
-                            <div className="space-y-2">
-                                {yesterdayWinners.map((winner, idx) => (
-                                    <div key={winner.id} className="flex justify-between items-center">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xl">
-                                                {idx === 0 ? "🥇" : idx === 1 ? "🥈" : "🥉"}
-                                            </span>
-                                            <span className={clsx(
-                                                "font-bold text-sm",
-                                                idx === 0 && "text-yellow-200",
-                                                idx === 1 && "text-slate-300",
-                                                idx === 2 && "text-orange-300"
-                                            )}>
-                                                {winner.user_id}
+                        {/* Yesterday's Champions */}
+                        {yesterdayWinners.length > 0 && (
+                            <div className="mb-6 bg-slate-950/50 border border-yellow-700/30 rounded-lg p-4">
+                                <h3 className="text-yellow-500 text-xs uppercase font-bold tracking-widest mb-3 flex items-center gap-2">
+                                    <Trophy size={14} /> Yesterday's Champions
+                                </h3>
+                                <div className="space-y-2">
+                                    {yesterdayWinners.map((winner, idx) => (
+                                        <div key={winner.id} className="flex justify-between items-center">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xl">
+                                                    {idx === 0 ? "🥇" : idx === 1 ? "🥈" : "🥉"}
+                                                </span>
+                                                <span className={clsx(
+                                                    "font-bold text-sm",
+                                                    idx === 0 && "text-yellow-200",
+                                                    idx === 1 && "text-slate-300",
+                                                    idx === 2 && "text-orange-300"
+                                                )}>
+                                                    {winner.user_id}
+                                                </span>
+                                            </div>
+                                            <span className="font-mono text-slate-400 text-sm">
+                                                {(winner.time_taken / 1000).toFixed(2)}s
                                             </span>
                                         </div>
-                                        <span className="font-mono text-slate-400 text-sm">
-                                            {(winner.time_taken / 1000).toFixed(2)}s
-                                        </span>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        )}
 
-                    {/* Action Button */}
-                    {status === GameStatus.IDLE ? (
                         <div className="mb-8">
                             {hasAttempted ? (
                                 <div className="bg-yellow-950/30 border border-yellow-700/50 p-4 rounded text-center">
@@ -276,37 +275,25 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, onExit
                                     </div>
                                     <button
                                         onClick={handleStart}
-                                        className="w-full py-4 bg-gradient-to-r from-red-900 to-red-700 hover:from-red-800 hover:to-red-600 text-white font-horror text-2xl tracking-widest rounded shadow-[0_0_20px_rgba(220,38,38,0.5)] transition-all hover:scale-105"
+                                        className="w-full py-4 bg-gradient-to-r from-red-900 to-red-700 hover:text-white text-red-100 font-horror text-2xl tracking-widest rounded shadow-[0_0_20px_rgba(220,38,38,0.5)] transition-all hover:scale-105"
                                     >
                                         BEGIN RITUAL
                                     </button>
                                 </>
                             )}
                         </div>
-                    ) : (
-                        <div className="mb-8 text-center">
-                            <h2 className={clsx("text-3xl font-horror mb-2", status === GameStatus.WON ? "text-green-500" : "text-red-600")}>
-                                {status === GameStatus.WON ? "RITUAL COMPLETE" : "RITUAL FAILED"}
-                            </h2>
-                            {status === GameStatus.WON && (
-                                <div className="text-4xl font-bold text-white mb-4">
-                                    {(elapsedTime / 1000).toFixed(3)}s
-                                </div>
-                            )}
-                            <button onClick={onExit} className="text-slate-500 hover:text-white underline">
-                                Leave
-                            </button>
-                        </div>
-                    )}
+                    </div>
                 </div>
-            ) : null}
+            )}
 
-            {/* Game Area (Scene + Sidebar) - Only show during active gameplay */}
-            {(status === GameStatus.PLAYING || status === GameStatus.WON || status === GameStatus.LOST) && (
-                <div className="flex-1 flex flex-col md:flex-row relative">
-                    {/* Timer Overlay */}
+            {/* ACTIVE GAME LAYOUT (Matches App.tsx) */}
+            <div className="flex flex-col lg:flex-row w-full h-full">
+
+                {/* 3D Scene Area */}
+                <div className="relative w-full h-[40vh] lg:h-full lg:flex-1 bg-black z-0 order-1 shadow-2xl lg:shadow-none">
+                    {/* Daily Timer Overlay */}
                     {status === GameStatus.PLAYING && (
-                        <div className="absolute top-4 left-4 z-50 bg-black/50 backdrop-blur border border-red-500/30 px-6 py-2 rounded-full flex items-center gap-3">
+                        <div className="absolute top-4 left-4 z-20 bg-black/50 backdrop-blur border border-red-500/30 px-6 py-2 rounded-full flex items-center gap-3 pointer-events-none">
                             <Clock className="text-red-500 animate-pulse" size={20} />
                             <span className="text-2xl font-mono font-bold text-red-100">
                                 {(elapsedTime / 1000).toFixed(2)}
@@ -314,61 +301,58 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, onExit
                         </div>
                     )}
 
-                    {/* 3D Scene */}
-                    <div className="relative w-full h-[40vh] md:h-full md:flex-1 bg-black">
-                        <GameSceneOverlay
-                            showJumpscare={false}
-                            currentJumpscareVideo=""
-                            setShowJumpscare={() => { }}
-                            autoNextRoundCountdown={null}
-                            round={1}
-                            gameLog={gameLog}
-                            mySpectators={[]}
-                            showHintUnlock={false}
-                        />
-                        <GameScene
-                            isWon={status === GameStatus.WON}
-                            isLost={status === GameStatus.LOST}
-                            wrongGuesses={wrongGuesses}
-                        />
-                    </div>
-
-                    {/* Sidebar (Force Minimal Mode?) */}
-                    <GameSidebar
-                        status={status}
-                        players={[{ id: 'me', name: username, mistakes: wrongGuesses, status: isWon ? 'WON' : isLost ? 'LOST' : 'PLAYING' } as any]}
-                        username={username}
-                        amIHost={true}
-                        spawnBot={() => { }}
-                        setShowRules={() => { }}
-                        showRules={false}
-                        loadingDifficulty={null}
-                        wordData={wordData}
-                        guessedLetters={guessedLetters}
-                        displayGuessedLetters={guessedLetters}
-                        unlockedHints={wrongGuesses + 1}
-                        revealedHints={wrongGuesses + 1}
-                        gameMode={'DAILY'}
-                        activeDebuffs={[]}
-                        curseEnergy={0}
-                        wrongGuesses={wrongGuesses}
-                        handleGuess={handleGuess}
-                        performSpellAction={() => { }}
-                        onSoulMend={() => { }}
-                        handleStartGame={handleStart} // Retry?
-                        handleOracle={() => { }} // Disable powers
-                        handleRoast={() => { }}
-                        handleGlitch={() => { }}
-                        hasScared={false}
-                        round={1}
-                        spectatingTargetId={null}
-                        setSpectatingTargetId={() => { }}
-                        setSpectating={() => { }}
+                    <GameSceneOverlay
+                        showJumpscare={false}
+                        currentJumpscareVideo=""
+                        setShowJumpscare={() => { }}
                         autoNextRoundCountdown={null}
-                        myId={'me'}
+                        round={1}
+                        gameLog={gameLog}
+                        mySpectators={[]}
+                        showHintUnlock={false}
+                    />
+                    <GameScene
+                        isWon={status === GameStatus.WON}
+                        isLost={status === GameStatus.LOST}
+                        wrongGuesses={wrongGuesses}
                     />
                 </div>
-            )}
+
+                {/* Sidebar */}
+                <GameSidebar
+                    status={status}
+                    players={[{ id: 'me', name: username, mistakes: wrongGuesses, status: isWon ? 'WON' : isLost ? 'LOST' : 'PLAYING' } as any]}
+                    username={username}
+                    amIHost={true}
+                    spawnBot={() => { }}
+                    setShowRules={() => { }}
+                    showRules={false}
+                    loadingDifficulty={null}
+                    wordData={wordData}
+                    guessedLetters={guessedLetters}
+                    displayGuessedLetters={guessedLetters}
+                    unlockedHints={wrongGuesses + 1}
+                    revealedHints={wrongGuesses + 1}
+                    gameMode={'DAILY'}
+                    activeDebuffs={[]}
+                    curseEnergy={0}
+                    wrongGuesses={wrongGuesses}
+                    handleGuess={handleGuess}
+                    performSpellAction={() => { }}
+                    onSoulMend={() => { }}
+                    handleStartGame={() => { }} // No restart in Daily
+                    handleOracle={() => { }}
+                    handleRoast={() => { }}
+                    handleGlitch={() => { }}
+                    hasScared={false}
+                    round={1}
+                    spectatingTargetId={null}
+                    setSpectatingTargetId={() => { }}
+                    setSpectating={() => { }}
+                    autoNextRoundCountdown={null}
+                    myId={'me'}
+                />
+            </div>
         </div>
     );
 };

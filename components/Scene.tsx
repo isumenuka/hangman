@@ -430,10 +430,12 @@ export const GameScene: React.FC<SceneProps> = ({ wrongGuesses, isWon, isLost, a
 
       <OrbitControls
         enablePan={false}
-        minPolarAngle={Math.PI / 3}
-        maxPolarAngle={Math.PI / 1.8}
-        minDistance={4}
-        maxDistance={25}
+        enableDamping
+        dampingFactor={0.05}
+        minPolarAngle={Math.PI / 6} // Allow looking from higher up
+        maxPolarAngle={Math.PI / 1.8} // Prevent going below ground
+        minDistance={5}
+        maxDistance={30}
       />
     </Canvas>
   );

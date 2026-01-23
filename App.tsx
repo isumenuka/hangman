@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { GameScene } from './components/Scene';
+import { User as AuthUser } from '@supabase/supabase-js';
 import { Lobby } from './components/game/Lobby';
 import { GameOver } from './components/game/GameOver';
 import { GameSceneOverlay } from './components/game/GameSceneOverlay';
@@ -44,6 +45,8 @@ export default function App() {
   const [loadingDifficulty, setLoadingDifficulty] = useState<'Easy' | 'Medium' | 'Hard' | null>(null);
   const [lobbyError, setLobbyError] = useState<string | null>(null);
   const [username, setUsername] = useState('');
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [showLoginAlert, setShowLoginAlert] = useState(false);
 
   // --- Gemini 2.0 Feature State ---
   const [wordQueue, setWordQueue] = useState<WordData[]>([]);
@@ -465,6 +468,7 @@ export default function App() {
   // Autofill Username from Auth
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
       if (session?.user?.email) {
         const name = session.user.email.split('@')[0];
         setUsername(name);
@@ -473,6 +477,7 @@ export default function App() {
 
     // Initial check
     supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user ?? null);
       if (user?.email) setUsername(user.email.split('@')[0]);
     });
 
@@ -911,19 +916,41 @@ export default function App() {
         </div>
 
         {/* Daily Ritual Top Left */}
-        <div className="fixed top-6 left-6 z-50">
+        <div className="fixed top-6 left-6 z-50 flex flex-col gap-2 items-start">
           <button
-            onClick={() => setGameMode('DAILY')}
+            onClick={() => {
+              if (!user) {
+                setShowLoginAlert(true);
+                // Auto hide after 5 seconds
+                setTimeout(() => setShowLoginAlert(false), 5000);
+                return;
+              }
+              setGameMode('DAILY');
+            }}
             className="px-6 py-3 bg-purple-950/80 hover:bg-purple-900 text-purple-200 rounded-lg font-bold border border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.3)] transition-all hover:scale-105 hover:shadow-[0_0_25px_rgba(168,85,247,0.5)] backdrop-blur-md"
           >
             <div className="flex items-center gap-3">
               <Clock size={20} className="text-purple-400 animate-pulse" />
-              <div className="flex flex-col items-start">
-                <span className="tracking-widest uppercase text-sm">Daily Ritual</span>
+              <div className="flex flex-col items-start gap-1">
+                <span className="tracking-widest uppercase text-sm leading-none">Daily Ritual</span>
                 <DailyCountdown />
               </div>
             </div>
           </button>
+
+          {/* Login Alert Toast */}
+          {showLoginAlert && (
+            <div className="bg-red-950/90 border border-red-500 p-4 rounded-lg shadow-xl animate-in fade-in slide-in-from-left-4 max-w-xs relative backdrop-blur-md">
+              <button onClick={() => setShowLoginAlert(false)} className="absolute top-2 right-2 text-red-400 hover:text-white"><X size={14} /></button>
+              <div className="flex items-start gap-3">
+                <User size={20} className="text-red-500 mt-1 shrink-0" />
+                <div>
+                  <h4 className="font-bold text-red-200 text-sm uppercase tracking-wider">Registration Required</h4>
+                  <p className="text-xs text-slate-300 mt-1">Only active accounts may enter the Daily Ritual. Please <strong>Save Progress</strong> (top right) to create an account.</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="absolute inset-0 z-0 opacity-50">
