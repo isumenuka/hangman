@@ -101,11 +101,38 @@ export const Auth = () => {
 
         try {
             if (isSignUp) {
-                // DISABLED: "Only can me"
-                setAuthError("Public registration is disabled. Ask the Admin.");
+                // PUBLIC SIGN UP - Use Supabase Auth (has email confirmation built-in)
+                const { data, error } = await supabase.auth.signUp({
+                    email,
+                    password,
+                    options: {
+                        emailRedirectTo: window.location.origin
+                    }
+                });
+
+                if (error) throw error;
+
+                setAuthError("✅ Account created! Please check your email to confirm your account.");
+                setIsSignUp(false);
             } else {
-                // 1. Try Custom Table First (Admin/Custom Auth)
-                const { data: customUser, error: customError } = await supabase
+                // LOGIN - Try both systems
+
+                // 1. Try Supabase Auth first (for public users who signed up)
+                const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+                    email,
+                    password
+                });
+
+                if (authData.user) {
+                    // Supabase Auth success
+                    setUser(authData.user);
+                    fetchStats(authData.user.id);
+                    setIsOpen(false);
+                    return;
+                }
+
+                // 2. If Supabase Auth failed, try Custom Table (for admin-created accounts)
+                const { data: customUser } = await supabase
                     .from('custom_users')
                     .select('*')
                     .eq('email', email)
@@ -113,10 +140,8 @@ export const Auth = () => {
 
                 if (customUser) {
                     // Custom Auth Found
-                    console.log("Found custom user payload, verifying...");
                     const isValid = await verifyPassword(password, customUser.password_hash);
                     if (isValid) {
-                        // Success! Fake a session user
                         const fakeUser: User = {
                             id: customUser.id,
                             aud: 'authenticated',
@@ -129,18 +154,14 @@ export const Auth = () => {
                         } as any;
 
                         setUser(fakeUser);
-                        fetchStats(customUser.id); // Load stats for this UUID
+                        fetchStats(customUser.id);
                         setIsOpen(false);
-                    } else {
-                        throw new Error("Invalid login credentials (Custom).");
+                        return;
                     }
-                } else {
-                    // Fallback to Supabase Auth (Legacy support if any)
-                    // If you want ONLY custom, remove this else block.
-                    // For safety, let's allow it to fail over or just error.
-                    // Assuming user wants ONLY custom for this new system.
-                    throw new Error("User not found.");
                 }
+
+                // Both failed
+                throw new Error("Invalid email or password.");
             }
         } catch (err: any) {
             setAuthError(err.message || "Authentication failed");
@@ -301,21 +322,21 @@ export const Auth = () => {
 
                     <button
                         type="submit"
-                        disabled={authLoading || isSignUp}
+                        disabled={authLoading}
                         className="w-full py-3 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded font-bold text-base transition-colors flex justify-center items-center shadow-lg shadow-red-900/20"
                     >
-                        {authLoading ? <Loader2 className="animate-spin" size={20} /> : (isSignUp ? 'Registration Closed' : 'Log In')}
+                        {authLoading ? <Loader2 className="animate-spin" size={20} /> : (isSignUp ? 'Create Account' : 'Log In')}
                     </button>
                 </form>
 
                 <div className="mt-6 text-center text-sm text-slate-500">
+                    {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
                     <button
                         onClick={() => { setIsSignUp(!isSignUp); setAuthError(null); }}
                         className="text-slate-400 hover:text-white underline font-medium"
                     >
-                        {isSignUp ? 'Back to Login' : 'Admin: Create Account?'}
+                        {isSignUp ? 'Back to Login' : 'Sign Up'}
                     </button>
-                    {isSignUp && <p className="mt-2 text-xs text-red-400">Public registration is closed. Contact the administrator to create an account.</p>}
                 </div>
             </div>
         </div>

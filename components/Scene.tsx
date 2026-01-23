@@ -375,8 +375,8 @@ export const GameScene: React.FC<SceneProps> = ({ wrongGuesses, isWon, isLost, a
     <Canvas
       shadows
       camera={{ position: [0, 0, 12], fov: 45 }}
-      gl={{ preserveDrawingBuffer: true }}
-      style={{ touchAction: 'none' }}
+      gl={{ preserveDrawingBuffer: true, antialias: true, powerPreference: 'high-performance' }}
+      style={{ touchAction: 'none', cursor: 'grab', pointerEvents: 'auto' }}
     >
       <ResponsiveCamera />
 

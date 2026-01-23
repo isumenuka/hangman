@@ -2,8 +2,6 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { WordData } from '../../types';
 import { GameStatus } from '../../types';
 import { getDailyWord, submitDailyAttempt, getDailyLeaderboard } from '../../services/dailyChallenge';
-import { GameScene } from '../Scene';
-import { GameSceneOverlay } from './GameSceneOverlay';
 import { GameSidebar } from './GameSidebar';
 import { Loader2, Trophy, Clock, Skull, ArrowLeft } from 'lucide-react';
 import { soundManager } from '../../utils/SoundManager';
@@ -312,45 +310,57 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, userId
                 <div className="flex flex-col lg:flex-row w-full h-full">
 
                     {/* 3D Scene Area */}
-                    <div className="relative w-full h-[40vh] lg:h-full lg:flex-1 bg-black z-0 order-1 shadow-2xl lg:shadow-none">
-                        {/* Daily Timer Overlay */}
-                        {status === GameStatus.PLAYING && (
-                            <div className="absolute top-4 left-4 z-20 bg-black/50 backdrop-blur border border-red-500/30 px-6 py-2 rounded-full flex items-center gap-3 pointer-events-none">
-                                <Clock className="text-red-500 animate-pulse" size={20} />
-                                <span className="text-2xl font-mono font-bold text-red-100">
-                                    {(elapsedTime / 1000).toFixed(2)}
-                                </span>
-                            </div>
-                        )}
+                    <div className="relative w-full h-[40vh] lg:h-full lg:flex-1 bg-black z-0 order-1 shadow-2xl lg:shadow-none" style={{ pointerEvents: 'auto' }}>
 
-                        <GameSceneOverlay
-                            showJumpscare={false}
-                            currentJumpscareVideo=""
-                            setShowJumpscare={() => { }}
-                            autoNextRoundCountdown={null}
-                            round={1}
-                            gameLog={gameLog}
-                            mySpectators={[]}
-                            showHintUnlock={false}
-                        />
-
-                        {/* Redirect Message Overlay */}
-                        {(status === GameStatus.WON || status === GameStatus.LOST) && (
-                            <div className="absolute top-20 w-full text-center z-50 pointer-events-none animate-pulse">
-                                <div className="inline-block bg-black/80 backdrop-blur border border-red-500/50 px-6 py-3 rounded-lg shadow-xl">
-                                    <p className="text-slate-200 text-sm font-bold uppercase tracking-widest mb-1">Ritual Complete</p>
-                                    <p className="text-red-400 text-xs flex items-center justify-center gap-2">
-                                        <Loader2 size={12} className="animate-spin" /> Returning to Menu...
-                                    </p>
+                        {/* All overlays wrapper */}
+                        <div className="absolute inset-0 z-10 pointer-events-none">
+                            {/* Daily Timer Overlay */}
+                            {status === GameStatus.PLAYING && (
+                                <div className="absolute top-4 left-4 bg-black/50 backdrop-blur border border-red-500/30 px-6 py-2 rounded-full flex items-center gap-3">
+                                    <Clock className="text-red-500 animate-pulse" size={20} />
+                                    <span className="text-2xl font-mono font-bold text-red-100">
+                                        {(elapsedTime / 1000).toFixed(2)}
+                                    </span>
                                 </div>
-                            </div>
-                        )}
+                            )}
 
-                        <GameScene
-                            isWon={status === GameStatus.WON}
-                            isLost={status === GameStatus.LOST}
-                            wrongGuesses={wrongGuesses}
-                        />
+                            {/* Game Log */}
+                            <div className="absolute top-20 left-4 w-full max-w-md flex flex-col gap-1">
+                                {gameLog.slice(0, 3).map(item => (
+                                    <div key={item.id} className="font-horror text-sm text-purple-300 tracking-widest drop-shadow-[0_2px_3px_rgba(0,0,0,1)] animate-in slide-in-from-left-4 fade-in duration-300">
+                                        {item.content}
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Game Complete Overlay */}
+                            {(status === GameStatus.WON || status === GameStatus.LOST) && (
+                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                                    <div className="bg-black/90 backdrop-blur border border-red-500/50 px-8 py-6 rounded-lg shadow-2xl text-center">
+                                        <p className="text-slate-200 text-lg font-bold uppercase tracking-widest mb-2">Ritual Complete</p>
+                                        <p className="text-red-400 text-sm flex items-center justify-center gap-2">
+                                            <Loader2 size={16} className="animate-spin" /> Returning to Menu...
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Simple 2D Hangman - No 3D */}
+                        <div className="flex flex-col items-center justify-center p-8">
+                            <div className="text-8xl mb-6">
+                                {wrongGuesses >= 6 ? '☠️' :
+                                    wrongGuesses >= 5 ? '😵' :
+                                        wrongGuesses >= 4 ? '😰' :
+                                            wrongGuesses >= 3 ? '😨' :
+                                                wrongGuesses >= 2 ? '😟' :
+                                                    wrongGuesses >= 1 ? '😐' : '😊'}
+                            </div>
+                            <div className="text-center">
+                                <div className="text-slate-400 text-xs uppercase tracking-widest mb-2">Mistakes</div>
+                                <div className="text-6xl font-horror text-red-500">{wrongGuesses} / 6</div>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Sidebar */}
