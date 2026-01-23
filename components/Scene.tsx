@@ -372,7 +372,12 @@ export const GameScene: React.FC<SceneProps> = ({ wrongGuesses, isWon, isLost, a
   }, [atmosphere]);
 
   return (
-    <Canvas shadows camera={{ position: [0, 0, 12], fov: 45 }}>
+    <Canvas
+      shadows
+      camera={{ position: [0, 0, 12], fov: 45 }}
+      gl={{ preserveDrawingBuffer: true }}
+      style={{ touchAction: 'none' }}
+    >
       <ResponsiveCamera />
 
       {/* Dynamic Background */}
@@ -382,17 +387,17 @@ export const GameScene: React.FC<SceneProps> = ({ wrongGuesses, isWon, isLost, a
       {/* --- Dynamic Lighting (BOOSTED) --- */}
 
       {/* Base Illumination (Fail-safe) */}
-      <hemisphereLight intensity={2.0} color="#ffffff" groundColor="#444444" />
+      <hemisphereLight intensity={4.0} color="#ffffff" groundColor="#888888" />
 
       {/* Ambient */}
-      <ambientLight intensity={3.0} color={settings.ambient} />
+      <ambientLight intensity={6.0} color={settings.ambient} />
 
       {/* Main Spot (Moonlight) */}
       <spotLight
         position={[-5, 10, 10]}
         angle={0.6}
         penumbra={0.5}
-        intensity={settings.spotIntensity * 2} // Double intensity
+        intensity={settings.spotIntensity * 4} // Quadruple intensity
         color={settings.spot}
         castShadow
         shadow-mapSize={[2048, 2048]}
@@ -400,13 +405,13 @@ export const GameScene: React.FC<SceneProps> = ({ wrongGuesses, isWon, isLost, a
       />
 
       {/* Fill Light (Warm) */}
-      <pointLight position={[2, 3, 5]} intensity={4} color="#e0e7ff" />
+      <pointLight position={[2, 3, 5]} intensity={8} color="#e0e7ff" />
 
       {/* Rim Light (Pop) */}
-      <spotLight position={[0, 5, -8]} intensity={8} color={settings.rim} />
+      <spotLight position={[0, 5, -8]} intensity={16} color={settings.rim} />
 
       {/* Ground illumination */}
-      <directionalLight position={[0, -5, 0]} intensity={2} color="#64748b" />
+      <directionalLight position={[0, -5, 0]} intensity={4} color="#94a3b8" />
 
       {/* --- Environment --- */}
       <Stars radius={100} depth={50} count={5000} factor={4} saturation={1} fade speed={0.5} />
@@ -429,11 +434,13 @@ export const GameScene: React.FC<SceneProps> = ({ wrongGuesses, isWon, isLost, a
       </mesh>
 
       <OrbitControls
+        makeDefault
+        enableZoom={true}
+        enableRotate={true}
         enablePan={false}
-        enableDamping
-        dampingFactor={0.05}
         minDistance={5}
         maxDistance={30}
+        rotateSpeed={0.5}
       />
     </Canvas>
   );

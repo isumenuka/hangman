@@ -61,7 +61,7 @@ export function GameSceneOverlay({
             </div>
 
             {/* Persistent Game Log (Top Left of 3D Scene) */}
-            <div className="absolute top-4 left-4 z-[10] w-full max-w-md pointer-events-none flex flex-col gap-1">
+            <div className="absolute top-20 left-4 z-[10] w-full max-w-md pointer-events-none flex flex-col gap-1">
                 {gameLog.map(item => (
                     <div key={item.id} className="font-horror text-sm tracking-widest drop-shadow-[0_2px_1px_rgba(0,0,0,1)] animate-in slide-in-from-left-4 fade-in duration-300">
                         {item.content}
