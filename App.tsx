@@ -29,12 +29,7 @@ import ShaderBackground from './components/ShaderBackground';
 const MAX_MISTAKES = 6;
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
-const JUMPSCARE_VIDEOS = [
 
-  '/jumpscare/vlipsy-creepy-face-jump-scare-3hEsFXt9.mp4',
-  '/jumpscare/vlipsy-jump-scare-creepy-doll-nwbQ9bDF.mp4',
-  '/jumpscare/vlipsy-winterrowd-jump-scare-IGMSPmB8.mp4'
-];
 
 export default function App() {
   // --- Local Game State ---
@@ -115,17 +110,10 @@ export default function App() {
   // Free Winner Powers (Tracking usage)
   const [winnerPowersUsed, setWinnerPowersUsed] = useState<{ FOG: boolean, SCRAMBLE: boolean, JUMPSCARE: boolean }>({ FOG: false, SCRAMBLE: false, JUMPSCARE: false });
 
-  const handlePerformSpellAction = (spell: 'FOG' | 'SCRAMBLE' | 'JUMPSCARE', targetId: string) => {
-    const cost = spell === 'FOG' ? 20 : spell === 'SCRAMBLE' ? 20 : 0;
-    if (spell !== 'JUMPSCARE') {
-      setCurseEnergy(prev => Math.max(0, prev - cost));
-    }
+  const handlePerformSpellAction = (spell: 'FOG' | 'SCRAMBLE', targetId: string) => {
+    const cost = 20; // Simplified cost as both are 20 now
+    setCurseEnergy(prev => Math.max(0, prev - cost));
     castSpell(spell, targetId);
-
-    if (spell === 'JUMPSCARE') {
-      setHasScared(true);
-      setTotalScaresUsed(prev => prev + 1);
-    }
     soundManager.playWin();
   };
 
@@ -139,16 +127,13 @@ export default function App() {
   const [unlockedHints, setUnlockedHints] = useState(1);
   const [showHintUnlock, setShowHintUnlock] = useState(false);
   const [showVisualRiddle, setShowVisualRiddle] = useState(false); // Visual Hint Toggle
-  const [hasScared, setHasScared] = useState(false); // Spam prevention
+  const [showVisualRiddle, setShowVisualRiddle] = useState(false); // Visual Hint Toggle
 
   // Round State
   const [round, setRound] = useState(1);
   const [roundStartTime, setRoundStartTime] = useState<number>(0);
   const [totalTimeTaken, setTotalTimeTaken] = useState(0); // My Accumulative Time
-  const [totalScaresUsed, setTotalScaresUsed] = useState(0); // My Accumulative Scares
   const [showGameOver, setShowGameOver] = useState(false);
-  const [showJumpscare, setShowJumpscare] = useState(false);
-  const [currentJumpscareVideo, setCurrentJumpscareVideo] = useState('');
   const [showDailyLogic, setShowDailyLogic] = useState(false);
 
   // --- GM Logic ---
