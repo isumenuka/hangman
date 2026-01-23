@@ -299,6 +299,7 @@ interface SceneProps {
   isWon: boolean;
   isLost: boolean;
   atmosphere?: AtmosphereType;
+  interactive?: boolean;
 }
 
 const ResponsiveCamera = () => {
@@ -332,7 +333,7 @@ const ResponsiveCamera = () => {
   return null;
 };
 
-export const GameScene: React.FC<SceneProps> = ({ wrongGuesses, isWon, isLost, atmosphere = 'NONE' }) => {
+export const GameScene: React.FC<SceneProps> = ({ wrongGuesses, isWon, isLost, atmosphere = 'NONE', interactive = true }) => {
 
   const settings = useMemo(() => {
     switch (atmosphere) {
@@ -433,15 +434,17 @@ export const GameScene: React.FC<SceneProps> = ({ wrongGuesses, isWon, isLost, a
         <meshStandardMaterial color={atmosphere === 'DARKNESS' ? '#111' : "#334155"} roughness={0.5} />
       </mesh>
 
-      <OrbitControls
-        makeDefault
-        enableZoom={true}
-        enableRotate={true}
-        enablePan={false}
-        minDistance={5}
-        maxDistance={30}
-        rotateSpeed={0.5}
-      />
+      {interactive && (
+        <OrbitControls
+          makeDefault
+          enableZoom={true}
+          enableRotate={true}
+          enablePan={false}
+          minDistance={5}
+          maxDistance={30}
+          rotateSpeed={0.5}
+        />
+      )}
     </Canvas>
   );
 };

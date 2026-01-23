@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { WordData } from '../../types';
 import { GameStatus } from '../../types';
 import { getDailyWord, submitDailyAttempt, getDailyLeaderboard } from '../../services/dailyChallenge';
+import { GameScene } from '../Scene';
 import { GameSidebar } from './GameSidebar';
 import { Loader2, Trophy, Clock, Skull, ArrowLeft } from 'lucide-react';
 import { soundManager } from '../../utils/SoundManager';
@@ -39,12 +40,16 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, userId
 
     // Initial Load
     useEffect(() => {
+        let mounted = true;
+
         const loadDaily = async () => {
             setLoading(true);
             try {
                 // 1. Fetch Word
                 const dailyData = await getDailyWord();
                 console.log('[DailyChallenge] Fetched Data:', dailyData);
+
+                if (!mounted) return;
 
                 if (!dailyData) throw new Error("Could not summon daily ritual.");
 
@@ -69,22 +74,22 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, userId
                 });
 
                 if (dailyData.prophecy) {
-                    setGameLog(prev => [{ id: Date.now(), content: <span className="text-purple-400 italic">"{dailyData.prophecy}"</span> }, ...prev]);
+                    // Use a unique ID or reset log to prevent duplicates
+                    setGameLog([{ id: Date.now(), content: <span className="text-purple-400 italic">"{dailyData.prophecy}"</span> }]);
                 }
 
                 // 2. Fetch Leaderboard
                 const lb = await getDailyLeaderboard();
-                setLeaderboard(lb);
+                if (mounted) setLeaderboard(lb);
 
                 // 3. Check if user already attempted today
-                // Prefer userId check if available, otherwise fallback to username
                 if (userId || username) {
                     const userAttempt = lb.find(a =>
                         (userId && a.user_id === userId) ||
                         (!userId && a.user_id === username)
                     );
 
-                    if (userAttempt) {
+                    if (userAttempt && mounted) {
                         setHasAttempted(true);
                     }
                 }
@@ -94,32 +99,35 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, userId
                 yesterday.setDate(yesterday.getDate() - 1);
                 const yesterdayDate = yesterday.toISOString().split('T')[0];
                 const yesterdayLeaderboard = await getDailyLeaderboard(yesterdayDate);
-                setYesterdayWinners(yesterdayLeaderboard.slice(0, 3));
+                if (mounted) setYesterdayWinners(yesterdayLeaderboard.slice(0, 3));
 
             } catch (e) {
                 console.error(e);
-                setGameLog(prev => [{ id: Date.now(), content: <span className="text-red-500">CONNECTION SEVERED. USING LOCAL RITUAL.</span> }, ...prev]);
-                // Fallback Word
-                setWordData({
-                    word: 'SACRIFICE',
-                    difficulty: 'Medium',
-                    category: 'Daily Ritual',
-                    hint: 'A necessary loss...',
-                    hints: [
-                        'First hint: It requires giving something up.',
-                        'Second hint: A holy offering.',
-                        'Third hint: To kill for a god.',
-                        'Fourth hint: One word, nine letters.',
-                        'Fifth hint: S_C_I_I_E'
-                    ]
-                });
+                if (mounted) {
+                    setGameLog([{ id: Date.now(), content: <span className="text-red-500">CONNECTION SEVERED. USING LOCAL RITUAL.</span> }]);
+                    // Fallback Word
+                    setWordData({
+                        word: 'SACRIFICE',
+                        difficulty: 'Medium',
+                        category: 'Daily Ritual',
+                        hint: 'A necessary loss...',
+                        hints: [
+                            'First hint: It requires giving something up.',
+                            'Second hint: A holy offering.',
+                            'Third hint: To kill for a god.',
+                            'Fourth hint: One word, nine letters.',
+                            'Fifth hint: S_C_I_I_E'
+                        ]
+                    });
+                }
             } finally {
-                setLoading(false);
+                if (mounted) setLoading(false);
             }
         };
         loadDaily();
 
         return () => {
+            mounted = false;
             if (timerRef.current) clearInterval(timerRef.current);
         }
     }, []);
@@ -310,7 +318,7 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, userId
                 <div className="flex flex-col lg:flex-row w-full h-full">
 
                     {/* 3D Scene Area */}
-                    <div className="relative w-full h-[40vh] lg:h-full lg:flex-1 bg-black z-0 order-1 shadow-2xl lg:shadow-none" style={{ pointerEvents: 'auto' }}>
+                    <div className="relative w-full h-[40vh] lg:h-full lg:flex-1 bg-black z-0 order-1 shadow-2xl lg:shadow-none" style={{ pointerEvents: 'none' }}>
 
                         {/* All overlays wrapper */}
                         <div className="absolute inset-0 z-10 pointer-events-none">
@@ -346,21 +354,14 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, userId
                             )}
                         </div>
 
-                        {/* Simple 2D Hangman - No 3D */}
-                        <div className="flex flex-col items-center justify-center p-8">
-                            <div className="text-8xl mb-6">
-                                {wrongGuesses >= 6 ? '☠️' :
-                                    wrongGuesses >= 5 ? '😵' :
-                                        wrongGuesses >= 4 ? '😰' :
-                                            wrongGuesses >= 3 ? '😨' :
-                                                wrongGuesses >= 2 ? '😟' :
-                                                    wrongGuesses >= 1 ? '😐' : '😊'}
-                            </div>
-                            <div className="text-center">
-                                <div className="text-slate-400 text-xs uppercase tracking-widest mb-2">Mistakes</div>
-                                <div className="text-6xl font-horror text-red-500">{wrongGuesses} / 6</div>
-                            </div>
-                        </div>
+
+                        {/* 3D Hangman Scene - Static/Non-Interactive */}
+                        <GameScene
+                            isWon={status === GameStatus.WON}
+                            isLost={status === GameStatus.LOST}
+                            wrongGuesses={wrongGuesses}
+                            interactive={false}
+                        />
                     </div>
 
                     {/* Sidebar */}
