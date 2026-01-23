@@ -412,173 +412,174 @@ export function GameSidebar({
                                     <span className="text-[10px] opacity-70">25pts</span>
                                 </button>
                             </div>
+                        </div>
                     )}
 
 
 
-                            {/* Keyboard */}
-                            <div className="grid grid-cols-7 gap-1">
-                                {currentAlphabet.map(letter => {
-                                    const isGuessed = guessedLetters.includes(letter);
-                                    const isCorrect = wordData?.word.includes(letter);
-                                    return (
-                                        <button
-                                            key={letter}
-                                            onClick={() => handleGuess(letter)}
-                                            disabled={isGuessed || status !== GameStatus.PLAYING}
-                                            className={clsx(
-                                                "aspect-square rounded flex items-center justify-center font-bold text-sm border transition-all active:scale-95 touch-manipulation",
-                                                isGuessed
-                                                    ? (isCorrect ? "bg-green-900/40 text-green-500 border-green-800" : "bg-slate-800/50 text-slate-600 border-transparent")
-                                                    : "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white"
-                                            )}
-                                        >
-                                            {letter}
-                                        </button>
-                                    )
-                                })}
-                            </div>
-                        </div>
-
-                {/* Restart Button */}
-                    {/* Restart / Return Button */}
-                    {
-                        (
-                            (gameMode === 'SINGLE' || (amIHost && players.every(p => p.status !== 'PLAYING'))) && status !== GameStatus.IDLE && status !== GameStatus.PLAYING && gameMode !== 'DAILY'
-                        ) || (
-                                gameMode === 'DAILY' && status !== GameStatus.IDLE && status !== GameStatus.PLAYING
-                            ) ? (
-                            <button
-                                onClick={() => handleStartGame()}
-                                className={clsx(
-                                    "mt-6 w-full py-3 text-white font-bold rounded flex items-center justify-center gap-2 transition-colors border-t",
-                                    gameMode === 'DAILY'
-                                        ? "bg-slate-800 hover:bg-slate-700 border-slate-600"
-                                        : "bg-red-900 hover:bg-red-800 border-red-700"
-                                )}
-                            >
-                                {gameMode === 'DAILY' ? (
-                                    <><ArrowLeft size={18} /> RETURN TO MENU</>
-                                ) : (
-                                    <><RotateCcw size={18} /> {status === GameStatus.WON || status === GameStatus.LOST ? `START ROUND ${round + 1}` : 'RESTART RITUAL'}</>
-                                )}
-                            </button>
-                        ) : null
-                    }
-
-                    {/* Spectator Controls */}
-                    {
-                        (status === GameStatus.WON || status === GameStatus.LOST) && !spectatingTargetId && gameMode !== 'SINGLE' && gameMode !== 'DAILY' && (
-                            <div className="mt-4 p-4 bg-slate-900/80 border border-slate-700 rounded">
-                                <h3 className="text-slate-400 text-xs uppercase font-bold mb-2">Spectate Players</h3>
-                                <div className="flex flex-wrap gap-2">
-                                    {players.filter(p => p.id !== myId && p.status === 'PLAYING').map(p => (
-                                        <button
-                                            key={p.id}
-                                            onClick={() => { setSpectatingTargetId(p.id); setSpectating(p.id); }}
-                                            className="text-xs bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded flex items-center gap-2 border border-slate-600"
-                                        >
-                                            <User size={12} /> {p.name}
-                                        </button>
-                                    ))}
-                                    {players.filter(p => p.id !== myId && p.status === 'PLAYING').length === 0 && (
-                                        <span className="text-slate-600 text-xs italic">No active players to watch.</span>
+                    {/* Keyboard */}
+                    <div className="grid grid-cols-7 gap-1">
+                        {currentAlphabet.map(letter => {
+                            const isGuessed = guessedLetters.includes(letter);
+                            const isCorrect = wordData?.word.includes(letter);
+                            return (
+                                <button
+                                    key={letter}
+                                    onClick={() => handleGuess(letter)}
+                                    disabled={isGuessed || status !== GameStatus.PLAYING}
+                                    className={clsx(
+                                        "aspect-square rounded flex items-center justify-center font-bold text-sm border transition-all active:scale-95 touch-manipulation",
+                                        isGuessed
+                                            ? (isCorrect ? "bg-green-900/40 text-green-500 border-green-800" : "bg-slate-800/50 text-slate-600 border-transparent")
+                                            : "bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white"
                                     )}
-                                </div>
-                            </div>
-                        )
-                    }
-
-                    {
-                        gameMode !== 'SINGLE' && !amIHost && status !== GameStatus.IDLE && status !== GameStatus.PLAYING && (
-                            <div className="mt-6 text-center text-slate-500 text-xs uppercase tracking-widest animate-pulse">
-                                {autoNextRoundCountdown !== null ? `Starting Round ${round + 1} in ${autoNextRoundCountdown}...` : "Waiting for all players..."}
-                            </div>
-                        )
-                    }
-
-                    {/* RITUAL SELECTION (Difficulty) */}
-                    {
-                        (gameMode === 'SINGLE' || (amIHost && players.every(p => p.status !== 'PLAYING'))) && status !== GameStatus.IDLE && status !== GameStatus.PLAYING && gameMode !== 'DAILY' && (
-                            <div className="mt-8 border-t border-slate-800 pt-6">
-                                <h3 className="text-slate-500 text-xs uppercase font-bold tracking-widest mb-4 text-center">Select Ritual Intensity</h3>
-                                <div className="grid grid-cols-3 gap-3">
-                                    <button
-                                        onClick={() => handleStartGame('Easy')}
-                                        className="py-3 bg-green-950/30 hover:bg-green-900/50 border border-green-800 hover:border-green-500 rounded text-green-400 font-bold text-xs uppercase tracking-wider transition-all"
-                                    >
-                                        Initiate
-                                    </button>
-                                    <button
-                                        onClick={() => handleStartGame('Medium')}
-                                        className="py-3 bg-yellow-950/30 hover:bg-yellow-900/50 border border-yellow-800 hover:border-yellow-500 rounded text-yellow-400 font-bold text-xs uppercase tracking-wider transition-all"
-                                    >
-                                        Summon
-                                    </button>
-                                    <button
-                                        onClick={() => handleStartGame('Hard')}
-                                        className="py-3 bg-red-950/30 hover:bg-red-900/50 border border-red-800 hover:border-red-500 rounded text-red-400 font-bold text-xs uppercase tracking-wider transition-all"
-                                    >
-                                        Curse
-                                    </button>
-                                </div>
-                                <div className="flex justify-between px-2 mt-1 text-[10px] text-slate-600 font-bold uppercase tracking-widest">
-                                    <span>Easy</span>
-                                    <span>Medium</span>
-                                    <span>Hard</span>
-                                </div>
-                            </div>
-                        )
-                    }
-
+                                >
+                                    {letter}
+                                </button>
+                            )
+                        })}
+                    </div>
                 </div>
 
-                {/* Target Selection Modal (Dedicated Popup) */}
+                {/* Restart Button */}
+                {/* Restart / Return Button */}
                 {
-                    spellToCast && (
-                        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                            <div className="bg-slate-900 border border-red-900 shadow-[0_0_50px_rgba(220,38,38,0.5)] rounded-lg w-full max-w-md p-6 flex flex-col gap-4">
+                    (
+                        (gameMode === 'SINGLE' || (amIHost && players.every(p => p.status !== 'PLAYING'))) && status !== GameStatus.IDLE && status !== GameStatus.PLAYING && gameMode !== 'DAILY'
+                    ) || (
+                            gameMode === 'DAILY' && status !== GameStatus.IDLE && status !== GameStatus.PLAYING
+                        ) ? (
+                        <button
+                            onClick={() => handleStartGame()}
+                            className={clsx(
+                                "mt-6 w-full py-3 text-white font-bold rounded flex items-center justify-center gap-2 transition-colors border-t",
+                                gameMode === 'DAILY'
+                                    ? "bg-slate-800 hover:bg-slate-700 border-slate-600"
+                                    : "bg-red-900 hover:bg-red-800 border-red-700"
+                            )}
+                        >
+                            {gameMode === 'DAILY' ? (
+                                <><ArrowLeft size={18} /> RETURN TO MENU</>
+                            ) : (
+                                <><RotateCcw size={18} /> {status === GameStatus.WON || status === GameStatus.LOST ? `START ROUND ${round + 1}` : 'RESTART RITUAL'}</>
+                            )}
+                        </button>
+                    ) : null
+                }
 
-                                <div className="text-center">
-                                    <h3 className="text-3xl font-horror text-red-600 tracking-wider mb-2">CAST {spellToCast}</h3>
-                                    <p className="text-slate-400 text-sm">Select a victim to curse...</p>
-                                </div>
-
-                                <div className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto">
-                                    {players.filter(p => p.id !== myId).map(p => (
-                                        <button
-                                            key={p.id}
-                                            onClick={() => executeSpell(p.id)}
-                                            disabled={p.status !== 'PLAYING'}
-                                            className="bg-black/50 hover:bg-red-900/40 border border-slate-700 hover:border-red-500 p-4 rounded flex items-center justify-between group transition-all"
-                                        >
-                                            <span className="font-bold text-slate-200 group-hover:text-white flex items-center gap-2">
-                                                <User size={16} /> {p.name}
-                                            </span>
-                                            {p.status !== 'PLAYING' ? (
-                                                <span className="text-[10px] text-slate-600 uppercase">Eliminated</span>
-                                            ) : (
-                                                <span className="text-xs text-red-500 opacity-0 group-hover:opacity-100 uppercase font-bold tracking-widest transition-opacity">
-                                                    CURSE
-                                                </span>
-                                            )}
-                                        </button>
-                                    ))}
-                                    {players.filter(p => p.id !== myId).length === 0 && (
-                                        <div className="text-center text-slate-600 italic py-4">No victims available...</div>
-                                    )}
-                                </div>
-
-                                <button
-                                    onClick={() => setSpellToCast(null)}
-                                    className="mt-2 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-bold transition-colors"
-                                >
-                                    CANCEL RITUAL
-                                </button>
+                {/* Spectator Controls */}
+                {
+                    (status === GameStatus.WON || status === GameStatus.LOST) && !spectatingTargetId && gameMode !== 'SINGLE' && gameMode !== 'DAILY' && (
+                        <div className="mt-4 p-4 bg-slate-900/80 border border-slate-700 rounded">
+                            <h3 className="text-slate-400 text-xs uppercase font-bold mb-2">Spectate Players</h3>
+                            <div className="flex flex-wrap gap-2">
+                                {players.filter(p => p.id !== myId && p.status === 'PLAYING').map(p => (
+                                    <button
+                                        key={p.id}
+                                        onClick={() => { setSpectatingTargetId(p.id); setSpectating(p.id); }}
+                                        className="text-xs bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded flex items-center gap-2 border border-slate-600"
+                                    >
+                                        <User size={12} /> {p.name}
+                                    </button>
+                                ))}
+                                {players.filter(p => p.id !== myId && p.status === 'PLAYING').length === 0 && (
+                                    <span className="text-slate-600 text-xs italic">No active players to watch.</span>
+                                )}
                             </div>
                         </div>
                     )
                 }
+
+                {
+                    gameMode !== 'SINGLE' && !amIHost && status !== GameStatus.IDLE && status !== GameStatus.PLAYING && (
+                        <div className="mt-6 text-center text-slate-500 text-xs uppercase tracking-widest animate-pulse">
+                            {autoNextRoundCountdown !== null ? `Starting Round ${round + 1} in ${autoNextRoundCountdown}...` : "Waiting for all players..."}
+                        </div>
+                    )
+                }
+
+                {/* RITUAL SELECTION (Difficulty) */}
+                {
+                    (gameMode === 'SINGLE' || (amIHost && players.every(p => p.status !== 'PLAYING'))) && status !== GameStatus.IDLE && status !== GameStatus.PLAYING && gameMode !== 'DAILY' && (
+                        <div className="mt-8 border-t border-slate-800 pt-6">
+                            <h3 className="text-slate-500 text-xs uppercase font-bold tracking-widest mb-4 text-center">Select Ritual Intensity</h3>
+                            <div className="grid grid-cols-3 gap-3">
+                                <button
+                                    onClick={() => handleStartGame('Easy')}
+                                    className="py-3 bg-green-950/30 hover:bg-green-900/50 border border-green-800 hover:border-green-500 rounded text-green-400 font-bold text-xs uppercase tracking-wider transition-all"
+                                >
+                                    Initiate
+                                </button>
+                                <button
+                                    onClick={() => handleStartGame('Medium')}
+                                    className="py-3 bg-yellow-950/30 hover:bg-yellow-900/50 border border-yellow-800 hover:border-yellow-500 rounded text-yellow-400 font-bold text-xs uppercase tracking-wider transition-all"
+                                >
+                                    Summon
+                                </button>
+                                <button
+                                    onClick={() => handleStartGame('Hard')}
+                                    className="py-3 bg-red-950/30 hover:bg-red-900/50 border border-red-800 hover:border-red-500 rounded text-red-400 font-bold text-xs uppercase tracking-wider transition-all"
+                                >
+                                    Curse
+                                </button>
+                            </div>
+                            <div className="flex justify-between px-2 mt-1 text-[10px] text-slate-600 font-bold uppercase tracking-widest">
+                                <span>Easy</span>
+                                <span>Medium</span>
+                                <span>Hard</span>
+                            </div>
+                        </div>
+                    )
+                }
+
             </div>
-            );
+
+            {/* Target Selection Modal (Dedicated Popup) */}
+            {
+                spellToCast && (
+                    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                        <div className="bg-slate-900 border border-red-900 shadow-[0_0_50px_rgba(220,38,38,0.5)] rounded-lg w-full max-w-md p-6 flex flex-col gap-4">
+
+                            <div className="text-center">
+                                <h3 className="text-3xl font-horror text-red-600 tracking-wider mb-2">CAST {spellToCast}</h3>
+                                <p className="text-slate-400 text-sm">Select a victim to curse...</p>
+                            </div>
+
+                            <div className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto">
+                                {players.filter(p => p.id !== myId).map(p => (
+                                    <button
+                                        key={p.id}
+                                        onClick={() => executeSpell(p.id)}
+                                        disabled={p.status !== 'PLAYING'}
+                                        className="bg-black/50 hover:bg-red-900/40 border border-slate-700 hover:border-red-500 p-4 rounded flex items-center justify-between group transition-all"
+                                    >
+                                        <span className="font-bold text-slate-200 group-hover:text-white flex items-center gap-2">
+                                            <User size={16} /> {p.name}
+                                        </span>
+                                        {p.status !== 'PLAYING' ? (
+                                            <span className="text-[10px] text-slate-600 uppercase">Eliminated</span>
+                                        ) : (
+                                            <span className="text-xs text-red-500 opacity-0 group-hover:opacity-100 uppercase font-bold tracking-widest transition-opacity">
+                                                CURSE
+                                            </span>
+                                        )}
+                                    </button>
+                                ))}
+                                {players.filter(p => p.id !== myId).length === 0 && (
+                                    <div className="text-center text-slate-600 italic py-4">No victims available...</div>
+                                )}
+                            </div>
+
+                            <button
+                                onClick={() => setSpellToCast(null)}
+                                className="mt-2 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded font-bold transition-colors"
+                            >
+                                CANCEL RITUAL
+                            </button>
+                        </div>
+                    </div>
+                )
+            }
+        </div>
+    );
 }
