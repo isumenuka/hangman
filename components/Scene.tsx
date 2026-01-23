@@ -419,8 +419,12 @@ export const GameScene: React.FC<SceneProps> = ({ wrongGuesses, isWon, isLost, a
       <Sparkles count={100} scale={15} size={4} speed={0.4} opacity={0.8} color={atmosphere === 'RED_FOG' ? '#ff0000' : '#818cf8'} />
 
       <React.Suspense fallback={null}>
-        <Cloud position={[-4, -2, -5]} speed={0.2} opacity={0.2} color={settings.fog} />
-        <Cloud position={[4, 2, -5]} speed={0.2} opacity={0.2} color={settings.fog} />
+        {interactive && (
+          <>
+            <Cloud position={[-4, -2, -5]} speed={0.2} opacity={0.2} color={settings.fog} />
+            <Cloud position={[4, 2, -5]} speed={0.2} opacity={0.2} color={settings.fog} />
+          </>
+        )}
       </React.Suspense>
 
       <group position={[0, -1, 0]}>
