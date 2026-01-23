@@ -432,8 +432,6 @@ export const GameScene: React.FC<SceneProps> = ({ wrongGuesses, isWon, isLost, a
         enablePan={false}
         enableDamping
         dampingFactor={0.05}
-        minPolarAngle={Math.PI / 6} // Allow looking from higher up
-        maxPolarAngle={Math.PI / 1.8} // Prevent going below ground
         minDistance={5}
         maxDistance={30}
       />
