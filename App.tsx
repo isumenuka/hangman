@@ -25,7 +25,7 @@ import { composeTheme } from './services/composer';
 import { AudioEngine } from './utils/AudioEngine';
 import ShaderBackground from './components/ShaderBackground';
 
-const MAX_MISTAKES = 5;
+const MAX_MISTAKES = 6;
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 const JUMPSCARE_VIDEOS = [
@@ -576,10 +576,10 @@ export default function App() {
     if (gameMode === 'SINGLE') {
       // Single player: use own mistakes
       totalLost = wrongGuesses;
-      totalLives = 6;
+      totalLives = MAX_MISTAKES;
     } else {
       // Multiplayer: use team total
-      totalLives = players.length * 6;
+      totalLives = players.length * MAX_MISTAKES;
       totalLost = players.reduce((sum, p) => sum + p.mistakes, 0);
     }
 
