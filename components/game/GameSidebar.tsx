@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import clsx from 'clsx';
-import { User, Users, HelpCircle, Loader2, Trophy, Skull, Scroll, RotateCcw, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { User, Users, HelpCircle, Loader2, Trophy, Skull, Scroll, RotateCcw, X, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
 import { GameStatus, Player, WordData } from '../../types';
 import { RulesModal } from '../RulesModal';
 import { getRitualPhrase } from '../../services/powers';
@@ -256,6 +256,31 @@ export function GameSidebar({
                     )}
                 </div>
 
+                {/* Visual Hint (Daily) */}
+                {wordData?.visual_hint_css && (
+                    <div className="mb-6 rounded-lg overflow-hidden border border-slate-700 relative h-32 w-full shadow-inner bg-black">
+                        <div
+                            className="absolute inset-0 transition-all duration-1000"
+                            style={(() => {
+                                try {
+                                    const styleObj: any = {};
+                                    wordData.visual_hint_css.split(';').forEach(rule => {
+                                        const [key, val] = rule.split(':');
+                                        if (key && val) {
+                                            const camelKey = key.trim().replace(/-./g, c => c.substr(1).toUpperCase());
+                                            styleObj[camelKey] = val.trim();
+                                        }
+                                    });
+                                    return styleObj;
+                                } catch (e) { return {}; }
+                            })()}
+                        />
+                        <div className="absolute bottom-2 right-2 text-[10px] text-white/50 uppercase font-bold tracking-widest bg-black/50 px-2 rounded backdrop-blur-sm border border-white/10">
+                            Visual Echo
+                        </div>
+                    </div>
+                )}
+
                 {/* Hint Display */}
                 <div className="mb-6">
                     <div className="flex justify-between items-center mb-2">
@@ -456,15 +481,29 @@ export function GameSidebar({
                 </div>
 
                 {/* Restart Button */}
+                {/* Restart / Return Button */}
                 {
-                    (gameMode === 'SINGLE' || (amIHost && players.every(p => p.status !== 'PLAYING'))) && status !== GameStatus.IDLE && status !== GameStatus.PLAYING && gameMode !== 'DAILY' && (
+                    (
+                        (gameMode === 'SINGLE' || (amIHost && players.every(p => p.status !== 'PLAYING'))) && status !== GameStatus.IDLE && status !== GameStatus.PLAYING && gameMode !== 'DAILY'
+                    ) || (
+                            gameMode === 'DAILY' && status !== GameStatus.IDLE && status !== GameStatus.PLAYING
+                        ) ? (
                         <button
                             onClick={() => handleStartGame()}
-                            className="mt-6 w-full py-3 bg-red-900 hover:bg-red-800 text-white font-bold rounded flex items-center justify-center gap-2 transition-colors border-t border-red-700"
+                            className={clsx(
+                                "mt-6 w-full py-3 text-white font-bold rounded flex items-center justify-center gap-2 transition-colors border-t",
+                                gameMode === 'DAILY'
+                                    ? "bg-slate-800 hover:bg-slate-700 border-slate-600"
+                                    : "bg-red-900 hover:bg-red-800 border-red-700"
+                            )}
                         >
-                            <RotateCcw size={18} /> {status === GameStatus.WON || status === GameStatus.LOST ? `START ROUND ${round + 1}` : 'RESTART RITUAL'}
+                            {gameMode === 'DAILY' ? (
+                                <><ArrowLeft size={18} /> RETURN TO MENU</>
+                            ) : (
+                                <><RotateCcw size={18} /> {status === GameStatus.WON || status === GameStatus.LOST ? `START ROUND ${round + 1}` : 'RESTART RITUAL'}</>
+                            )}
                         </button>
-                    )
+                    ) : null
                 }
 
                 {/* Spectator Controls */}

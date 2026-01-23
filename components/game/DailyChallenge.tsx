@@ -62,11 +62,16 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, onExit
 
                 setWordData({
                     word: dailyData.word,
-                    difficulty: 'Hard',
+                    difficulty: dailyData.difficulty || 'Hard',
                     category: 'Daily Ritual',
                     hint: safeHints[0],
-                    hints: safeHints
+                    hints: safeHints,
+                    visual_hint_css: dailyData.visual_hint_css
                 });
+
+                if (dailyData.prophecy) {
+                    setGameLog(prev => [{ id: Date.now(), content: <span className="text-purple-400 italic">"{dailyData.prophecy}"</span> }, ...prev]);
+                }
 
                 // 2. Fetch Leaderboard
                 const lb = await getDailyLeaderboard();
@@ -364,7 +369,7 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, onExit
                         handleGuess={handleGuess}
                         performSpellAction={() => { }}
                         onSoulMend={() => { }}
-                        handleStartGame={() => { }} // No restart in Daily
+                        handleStartGame={onExit} // Allow exit button handling
                         handleOracle={() => { }}
                         handleRoast={() => { }}
                         handleGlitch={() => { }}

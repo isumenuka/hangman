@@ -43,6 +43,57 @@ export const Auth = () => {
         setStats(data);
     };
 
+
+    // --- CUSTOM AUTH LOGIC (Client-Side for Demo/Admin) ---
+    // Note: In a production app, password verification should happen on a server/Edge Function.
+    // Since we are client-only, we accept the risk of fetching the hash for verification.
+
+    const verifyPassword = async (password: string, storedHash: string): Promise<boolean> => {
+        const [saltHex, originalHashHex] = storedHash.split(':');
+        const enc = new TextEncoder();
+        const keyMaterial = await window.crypto.subtle.importKey(
+            "raw",
+            enc.encode(password),
+            { name: "PBKDF2" },
+            false,
+            ["deriveBits", "deriveKey"]
+        );
+
+        const salt = Uint8Array.from(saltHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+
+        const key = await window.crypto.subtle.deriveKey(
+            {
+                name: "PBKDF2",
+                salt: salt,
+                iterations: 1000,
+                hash: "SHA-512"
+            },
+            keyMaterial,
+            { name: "HMAC", hash: "SHA-512", length: 512 },
+            true,
+            ["sign", "verify"]
+        );
+
+        // Export key to compare bytes (or re-derive bits)
+        // Actually simplest is deriveBits for hash comparison
+        const derivedBits = await window.crypto.subtle.deriveBits(
+            {
+                name: "PBKDF2",
+                salt: salt,
+                iterations: 1000,
+                hash: "SHA-512"
+            },
+            keyMaterial,
+            512
+        );
+
+        const derivedHashHex = Array.from(new Uint8Array(derivedBits))
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
+
+        return derivedHashHex === originalHashHex;
+    };
+
     const handleAuth = async (e: React.FormEvent) => {
         e.preventDefault();
         setAuthLoading(true);
@@ -50,14 +101,46 @@ export const Auth = () => {
 
         try {
             if (isSignUp) {
-                const { error } = await supabase.auth.signUp({ email, password });
-                if (error) throw error;
-                setAuthError("Account created! You can now sign in.");
-                setIsSignUp(false); // Switch to login
+                // DISABLED: "Only can me"
+                setAuthError("Public registration is disabled. Ask the Admin.");
             } else {
-                const { error } = await supabase.auth.signInWithPassword({ email, password });
-                if (error) throw error;
-                // Success handled by onAuthStateChange
+                // 1. Try Custom Table First (Admin/Custom Auth)
+                const { data: customUser, error: customError } = await supabase
+                    .from('custom_users')
+                    .select('*')
+                    .eq('email', email)
+                    .maybeSingle();
+
+                if (customUser) {
+                    // Custom Auth Found
+                    console.log("Found custom user payload, verifying...");
+                    const isValid = await verifyPassword(password, customUser.password_hash);
+                    if (isValid) {
+                        // Success! Fake a session user
+                        const fakeUser: User = {
+                            id: customUser.id,
+                            aud: 'authenticated',
+                            role: 'authenticated',
+                            email: customUser.email,
+                            app_metadata: {},
+                            user_metadata: {},
+                            created_at: customUser.created_at,
+                            updated_at: new Date().toISOString()
+                        } as any;
+
+                        setUser(fakeUser);
+                        fetchStats(customUser.id); // Load stats for this UUID
+                        setIsOpen(false);
+                    } else {
+                        throw new Error("Invalid login credentials (Custom).");
+                    }
+                } else {
+                    // Fallback to Supabase Auth (Legacy support if any)
+                    // If you want ONLY custom, remove this else block.
+                    // For safety, let's allow it to fail over or just error.
+                    // Assuming user wants ONLY custom for this new system.
+                    throw new Error("User not found.");
+                }
             }
         } catch (err: any) {
             setAuthError(err.message || "Authentication failed");
@@ -67,7 +150,9 @@ export const Auth = () => {
     };
 
     const handleLogout = async () => {
+        // Clear Supabase session if any
         await supabase.auth.signOut();
+        // Clear local state
         setUser(null);
         setStats(null);
         setIsOpen(false);
@@ -180,7 +265,7 @@ export const Auth = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
             <div className="bg-slate-900 border border-slate-700 p-6 rounded-lg shadow-xl text-left w-full max-w-sm relative">
                 <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl text-slate-200 font-bold">{isSignUp ? 'Create Account' : 'Sign In'}</h3>
+                    <h3 className="text-xl text-slate-200 font-bold">{isSignUp ? 'Registration Disabled' : 'Member Login'}</h3>
                     <button onClick={() => setIsOpen(false)} className="text-slate-500 hover:text-white"><LogOut size={20} /></button>
                 </div>
 
@@ -216,21 +301,21 @@ export const Auth = () => {
 
                     <button
                         type="submit"
-                        disabled={authLoading}
-                        className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded font-bold text-base transition-colors flex justify-center items-center shadow-lg shadow-red-900/20"
+                        disabled={authLoading || isSignUp}
+                        className="w-full py-3 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded font-bold text-base transition-colors flex justify-center items-center shadow-lg shadow-red-900/20"
                     >
-                        {authLoading ? <Loader2 className="animate-spin" size={20} /> : (isSignUp ? 'Sign Up' : 'Login')}
+                        {authLoading ? <Loader2 className="animate-spin" size={20} /> : (isSignUp ? 'Registration Closed' : 'Log In')}
                     </button>
                 </form>
 
                 <div className="mt-6 text-center text-sm text-slate-500">
-                    {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
                     <button
                         onClick={() => { setIsSignUp(!isSignUp); setAuthError(null); }}
-                        className="text-slate-300 hover:text-white underline font-medium"
+                        className="text-slate-400 hover:text-white underline font-medium"
                     >
-                        {isSignUp ? 'Login' : 'Sign Up'}
+                        {isSignUp ? 'Back to Login' : 'Admin: Create Account?'}
                     </button>
+                    {isSignUp && <p className="mt-2 text-xs text-red-400">Public registration is closed. Contact the administrator to create an account.</p>}
                 </div>
             </div>
         </div>

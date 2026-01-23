@@ -3,6 +3,8 @@ CREATE TABLE IF NOT EXISTS daily_challenges (
     date DATE PRIMARY KEY DEFAULT CURRENT_DATE,
     word TEXT NOT NULL CHECK (length(word) >= 10),
     hints JSONB, -- Array of 5 strings
+    difficulty TEXT, -- Easy, Medium, Hard
+    meta JSONB, -- Visual hints, prophecy, etc.
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -44,3 +46,18 @@ CREATE TABLE IF NOT EXISTS game_history (
 ALTER TABLE game_history ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Read History" ON game_history FOR SELECT USING (true);
 CREATE POLICY "Log Game" ON game_history FOR INSERT WITH CHECK (true);
+
+-- Create Custom Users Table (for Admin-controlled auth)
+CREATE TABLE IF NOT EXISTS custom_users (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    is_confirmed BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Policy: Only allow SELECT based on specific logic (or public for login check, but RLS usually blocks direct access)
+-- For this simple implementation, we'll allow public read to check login (in a real app, use a function)
+ALTER TABLE custom_users ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public Read Users" ON custom_users FOR SELECT USING (true);
+CREATE POLICY "Admin Insert Users" ON custom_users FOR INSERT WITH CHECK (true);
