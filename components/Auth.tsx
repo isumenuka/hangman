@@ -304,9 +304,7 @@ export const Auth = () => {
                             required
                         />
                     </div>
-                            required
-                        />
-                    </div>
+
                     <div>
                         <input
                             type="password"
