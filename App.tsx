@@ -127,7 +127,7 @@ export default function App() {
   const [unlockedHints, setUnlockedHints] = useState(1);
   const [showHintUnlock, setShowHintUnlock] = useState(false);
   const [showVisualRiddle, setShowVisualRiddle] = useState(false); // Visual Hint Toggle
-  const [showVisualRiddle, setShowVisualRiddle] = useState(false); // Visual Hint Toggle
+
 
   // Round State
   const [round, setRound] = useState(1);
