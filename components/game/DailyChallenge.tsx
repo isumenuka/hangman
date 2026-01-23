@@ -13,10 +13,11 @@ import { generateWord } from '../../services/wordGenerator'; // Re-use for hint 
 
 interface DailyChallengeProps {
     username: string;
+    userId?: string;
     onExit: () => void;
 }
 
-export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, onExit }) => {
+export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, userId, onExit }) => {
     const [status, setStatus] = useState<GameStatus>(GameStatus.IDLE);
     const [wordData, setWordData] = useState<WordData | null>(null);
     const [guessedLetters, setGuessedLetters] = useState<string[]>([]);
@@ -78,8 +79,13 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, onExit
                 setLeaderboard(lb);
 
                 // 3. Check if user already attempted today
-                if (username) {
-                    const userAttempt = lb.find(a => a.user_id === username);
+                // Prefer userId check if available, otherwise fallback to username
+                if (userId || username) {
+                    const userAttempt = lb.find(a =>
+                        (userId && a.user_id === userId) ||
+                        (!userId && a.user_id === username)
+                    );
+
                     if (userAttempt) {
                         setHasAttempted(true);
                     }
@@ -129,7 +135,7 @@ export const DailyChallenge: React.FC<DailyChallengeProps> = ({ username, onExit
                 soundManager.playWin();
 
                 // Submit Score
-                submitDailyAttempt(username || 'Anonymous', elapsedTime);
+                submitDailyAttempt(userId || username || 'Anonymous', elapsedTime);
 
                 // Log History
                 logGameHistory({

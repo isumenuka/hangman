@@ -256,31 +256,6 @@ export function GameSidebar({
                     )}
                 </div>
 
-                {/* Visual Hint (Daily) */}
-                {wordData?.visual_hint_css && (
-                    <div className="mb-6 rounded-lg overflow-hidden border border-slate-700 relative h-32 w-full shadow-inner bg-black">
-                        <div
-                            className="absolute inset-0 transition-all duration-1000"
-                            style={(() => {
-                                try {
-                                    const styleObj: any = {};
-                                    wordData.visual_hint_css.split(';').forEach(rule => {
-                                        const [key, val] = rule.split(':');
-                                        if (key && val) {
-                                            const camelKey = key.trim().replace(/-./g, c => c.substr(1).toUpperCase());
-                                            styleObj[camelKey] = val.trim();
-                                        }
-                                    });
-                                    return styleObj;
-                                } catch (e) { return {}; }
-                            })()}
-                        />
-                        <div className="absolute bottom-2 right-2 text-[10px] text-white/50 uppercase font-bold tracking-widest bg-black/50 px-2 rounded backdrop-blur-sm border border-white/10">
-                            Visual Echo
-                        </div>
-                    </div>
-                )}
-
                 {/* Hint Display */}
                 <div className="mb-6">
                     <div className="flex justify-between items-center mb-2">

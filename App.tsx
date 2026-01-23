@@ -1093,6 +1093,7 @@ export default function App() {
     return (
       <DailyChallenge
         username={username}
+        userId={user?.id}
         onExit={() => setGameMode('MENU')}
       />
     );
