@@ -294,16 +294,7 @@ export const Auth = () => {
                             required
                         />
                     </div>
-                    <div>
-                        <input
-                            type="password"
-                            placeholder="Password"
-                            value={password}
-                            onChange={e => setPassword(e.target.value)}
-                            className="w-full bg-slate-950 border border-slate-700 rounded p-3 text-slate-200 text-base focus:border-red-500 outline-none placeholder:text-slate-600"
-                            required
-                        />
-                    </div>
+
 
                     <div>
                         <input
