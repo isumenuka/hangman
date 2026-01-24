@@ -1,9 +1,16 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const genAI = new GoogleGenerativeAI(API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+// Helper for lazy initialization
+const getModel = () => {
+    const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!API_KEY) {
+        console.warn("VITE_GEMINI_API_KEY is missing. Powers features will fail.");
+        return null;
+    }
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    return genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+};
 
 // --- 1. The Oracle (Hint) ---
 export const getOracleHint = async (word: string): Promise<string> => {
@@ -19,6 +26,8 @@ export const getOracleHint = async (word: string): Promise<string> => {
   `;
 
     try {
+        const model = getModel();
+        if (!model) throw new Error("API Key Missing");
         const result = await model.generateContent(prompt);
         const text = result.response.text();
         return text.trim();
@@ -45,6 +54,8 @@ export const generateRoast = async (targetName: string, mistakes: number, score:
   `;
 
     try {
+        const model = getModel();
+        if (!model) throw new Error("API Key Missing");
         const result = await model.generateContent(prompt);
         const text = result.response.text();
         return text.trim();
@@ -69,6 +80,8 @@ export const generateGlitchText = async (): Promise<string> => {
   `;
 
     try {
+        const model = getModel();
+        if (!model) throw new Error("API Key Missing");
         const result = await model.generateContent(prompt);
         const text = result.response.text();
         return text.trim();
@@ -90,6 +103,8 @@ export const getRitualPhrase = async (): Promise<string> => {
   `;
 
     try {
+        const model = getModel();
+        if (!model) throw new Error("API Key Missing");
         const result = await model.generateContent(prompt);
         return result.response.text().trim().replace(/['"]/g, '');
     } catch (e) {

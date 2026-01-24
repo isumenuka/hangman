@@ -110,6 +110,16 @@ export default function App() {
   // Free Winner Powers (Tracking usage)
   const [winnerPowersUsed, setWinnerPowersUsed] = useState<{ FOG: boolean, SCRAMBLE: boolean, JUMPSCARE: boolean }>({ FOG: false, SCRAMBLE: false, JUMPSCARE: false });
 
+  // Jumpscare State
+  const JUMPSCARE_VIDEOS = [
+    "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMjR4MXZ4bmZ4bmZ4bmZ4bmZ4bmZ4bmZ4bmZ4/3o7TKSjRrfIPjeiVyM/giphy.mp4",
+    "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExMjR4MXZ4bmZ4bmZ4bmZ4bmZ4bmZ4bmZ4bmZ4/l0MYEqEzwMWFCg8rm/giphy.mp4",
+  ];
+  const [showJumpscare, setShowJumpscare] = useState(false);
+  const [currentJumpscareVideo, setCurrentJumpscareVideo] = useState(JUMPSCARE_VIDEOS[0]);
+  const [hasScared, setHasScared] = useState(false);
+  const [totalScaresUsed, setTotalScaresUsed] = useState(0);
+
   const handlePerformSpellAction = (spell: 'FOG' | 'SCRAMBLE', targetId: string) => {
     const cost = 20; // Simplified cost as both are 20 now
     setCurseEnergy(prev => Math.max(0, prev - cost));

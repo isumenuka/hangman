@@ -1,8 +1,15 @@
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const genAI = new GoogleGenerativeAI(API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+// Helper for lazy initialization
+const getModel = () => {
+    const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!API_KEY) {
+        console.warn("VITE_GEMINI_API_KEY is missing. Imposter features will fail.");
+        return null;
+    }
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    return genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+};
 
 export interface BotAction {
     type: 'CHAT' | 'GUESS' | 'WAIT';
@@ -58,6 +65,9 @@ export const getBotAction = async (
     };
 
     try {
+        const model = getModel();
+        if (!model) return { type: 'WAIT', content: '' };
+
         const result = await model.generateContent({
             contents: [{ role: "user", parts: [{ text: prompt }] }],
             generationConfig: {

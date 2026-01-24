@@ -1,56 +1,63 @@
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-const genAI = new GoogleGenerativeAI(apiKey);
+// Helper for lazy initialization with specific schema
+const getModel = () => {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+        console.warn("VITE_GEMINI_API_KEY is missing. Composer will fail.");
+        return null;
+    }
+    const genAI = new GoogleGenerativeAI(apiKey);
 
-const model = genAI.getGenerativeModel({
-    model: "gemini-2.0-flash-exp",
-    generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: {
-            type: SchemaType.OBJECT,
-            properties: {
-                bpm: { type: SchemaType.NUMBER },
-                baseKey: { type: SchemaType.STRING },
-                mood: { type: SchemaType.STRING },
-                instruments: {
-                    type: SchemaType.ARRAY,
-                    items: {
-                        type: SchemaType.OBJECT,
-                        properties: {
-                            name: { type: SchemaType.STRING, enum: ["bass", "lead", "pad", "noise"] },
-                            oscillator: { type: SchemaType.STRING, enum: ["fmsine", "amtriangle", "sawtooth", "square", "pwm"] },
-                            envelope: {
-                                type: SchemaType.OBJECT,
-                                properties: {
-                                    attack: { type: SchemaType.NUMBER },
-                                    decay: { type: SchemaType.NUMBER },
-                                    sustain: { type: SchemaType.NUMBER },
-                                    release: { type: SchemaType.NUMBER }
-                                },
-                                required: ["attack", "decay", "sustain", "release"]
-                            },
-                            notes: {
-                                type: SchemaType.ARRAY,
-                                items: {
+    return genAI.getGenerativeModel({
+        model: "gemini-2.0-flash-exp",
+        generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: SchemaType.OBJECT,
+                properties: {
+                    bpm: { type: SchemaType.NUMBER },
+                    baseKey: { type: SchemaType.STRING },
+                    mood: { type: SchemaType.STRING },
+                    instruments: {
+                        type: SchemaType.ARRAY,
+                        items: {
+                            type: SchemaType.OBJECT,
+                            properties: {
+                                name: { type: SchemaType.STRING, enum: ["bass", "lead", "pad", "noise"] },
+                                oscillator: { type: SchemaType.STRING, enum: ["fmsine", "amtriangle", "sawtooth", "square", "pwm"] },
+                                envelope: {
                                     type: SchemaType.OBJECT,
                                     properties: {
-                                        note: { type: SchemaType.STRING }, // e.g. "C2", "G#5", or null for rest
-                                        duration: { type: SchemaType.STRING }, // e.g. "4n", "8n"
-                                        time: { type: SchemaType.STRING } // e.g. "0:0:0", "0:0:2"
+                                        attack: { type: SchemaType.NUMBER },
+                                        decay: { type: SchemaType.NUMBER },
+                                        sustain: { type: SchemaType.NUMBER },
+                                        release: { type: SchemaType.NUMBER }
                                     },
-                                    required: ["note", "duration", "time"]
+                                    required: ["attack", "decay", "sustain", "release"]
+                                },
+                                notes: {
+                                    type: SchemaType.ARRAY,
+                                    items: {
+                                        type: SchemaType.OBJECT,
+                                        properties: {
+                                            note: { type: SchemaType.STRING }, // e.g. "C2", "G#5", or null for rest
+                                            duration: { type: SchemaType.STRING }, // e.g. "4n", "8n"
+                                            time: { type: SchemaType.STRING } // e.g. "0:0:0", "0:0:2"
+                                        },
+                                        required: ["note", "duration", "time"]
+                                    }
                                 }
-                            }
-                        },
-                        required: ["name", "oscillator", "envelope", "notes"]
+                            },
+                            required: ["name", "oscillator", "envelope", "notes"]
+                        }
                     }
-                }
-            },
-            required: ["bpm", "mood", "instruments"]
+                },
+                required: ["bpm", "mood", "instruments"]
+            }
         }
-    }
-});
+    });
+};
 
 export interface ComposerData {
     bpm: number;
@@ -85,6 +92,9 @@ export const composeTheme = async (word: string, atmosphere: string): Promise<Co
   `;
 
     try {
+        const model = getModel();
+        if (!model) throw new Error("API Key Missing");
+
         const result = await model.generateContent(prompt);
         const response = await result.response;
         return JSON.parse(response.text());

@@ -4,9 +4,15 @@ import { GameMasterResponse } from "../types";
 // API Key provided by user
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-const genAI = new GoogleGenerativeAI(API_KEY);
-// Using Flash for speed as per plan
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+// Lazy initialization wrapper to prevent crash on load if key is missing
+const getModel = () => {
+    if (!API_KEY) {
+        console.warn("VITE_GEMINI_API_KEY is missing. Game Master features will fail.");
+        return null;
+    }
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    return genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+};
 
 export const consultGameMaster = async (
     context: {
@@ -70,6 +76,9 @@ export const consultGameMaster = async (
     };
 
     try {
+        const model = getModel();
+        if (!model) throw new Error("API Key Missing");
+
         const result = await model.generateContent({
             contents: [{ role: "user", parts: [{ text: prompt }] }],
             generationConfig: {
